@@ -1,0 +1,504 @@
+import 'package:flutter/material.dart';
+import '../models/book.dart';
+import '../services/api_service.dart';
+import 'book_form_screen.dart';
+
+class BooksListScreen extends StatefulWidget {
+  const BooksListScreen({
+    super.key,
+    required this.onThemeToggle,
+    required this.isDarkMode,
+  });
+
+  final VoidCallback onThemeToggle;
+  final bool isDarkMode;
+
+  @override
+  State<BooksListScreen> createState() => _BooksListScreenState();
+}
+
+class _BooksListScreenState extends State<BooksListScreen> {
+  final ApiService _apiService = ApiService();
+  final TextEditingController _searchController = TextEditingController();
+  List<Book> _allBooks = [];
+  List<Book> _filteredBooks = [];
+  bool _isLoading = true;
+  String? _error;
+  String _readFilter = 'all'; // 'all', 'read', 'unread'
+  String? _typeFilter; // null = all types
+  String _sortBy = 'none'; // 'none', 'title', 'author'
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBooks();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadBooks() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final books = await _apiService.getBooks();
+      setState(() {
+        _allBooks = books;
+        _filteredBooks = books;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _filterBooks() {
+    final query = _searchController.text.toLowerCase();
+    setState(() {
+      _filteredBooks = _allBooks.where((book) {
+        final matchesSearch = query.isEmpty ||
+            book.title.toLowerCase().contains(query) ||
+            book.author.toLowerCase().contains(query);
+        
+        final matchesReadFilter = _readFilter == 'all' ||
+            (_readFilter == 'read' && book.isRead) ||
+            (_readFilter == 'unread' && !book.isRead);
+        
+        final matchesTypeFilter = _typeFilter == null ||
+            book.type == _typeFilter;
+        
+        return matchesSearch && matchesReadFilter && matchesTypeFilter;
+      }).toList();
+      
+      // Apply sorting
+      if (_sortBy == 'title') {
+        _filteredBooks.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+      } else if (_sortBy == 'author') {
+        _filteredBooks.sort((a, b) => a.author.toLowerCase().compareTo(b.author.toLowerCase()));
+      }
+    });
+  }
+  
+  List<String> _getUniqueTypes() {
+    final types = _allBooks.map((book) => book.type).toSet().toList();
+    types.sort();
+    return types;
+  }
+
+  Future<void> _deleteBook(int id) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Boek verwijderen'),
+        content: const Text('Weet je zeker dat je dit boek wilt verwijderen?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Annuleren'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Verwijderen'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        await _apiService.deleteBook(id);
+        _loadBooks();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Boek verwijderd')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Fout bij verwijderen: $e')),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _navigateToForm([Book? book]) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => BookFormScreen(book: book),
+      ),
+    );
+
+    if (result == true) {
+      _loadBooks();
+    }
+  }
+
+  Widget _buildFilterChip(String label, String value) {
+    final isSelected = _readFilter == value;
+    return ChoiceChip(
+      label: Text(label),
+      selected: isSelected,
+      onSelected: (selected) {
+        if (selected) {
+          setState(() => _readFilter = value);
+          _filterBooks();
+        }
+      },
+      selectedColor: const Color(0xFF6D4C41),
+      labelStyle: TextStyle(
+        color: isSelected ? Colors.white : Colors.black,
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+      ),
+      side: const BorderSide(color: Color(0xFFE6E1D9)),
+    );
+  }
+  
+  Widget _buildSortChip(String label, String value) {
+    final isSelected = _sortBy == value;
+    return ChoiceChip(
+      label: Text(label),
+      selected: isSelected,
+      onSelected: (selected) {
+        if (selected) {
+          setState(() => _sortBy = value);
+          _filterBooks();
+        }
+      },
+      selectedColor: const Color(0xFFA1887F),
+      labelStyle: TextStyle(
+        color: isSelected ? Colors.white : Colors.black,
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+      ),
+      side: const BorderSide(color: Color(0xFFE6E1D9)),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F5DC),
+      appBar: AppBar(
+        title: const Text('Mijn Boeken'),
+        actions: [
+          IconButton(
+            onPressed: widget.onThemeToggle,
+            tooltip: widget.isDarkMode ? 'Licht thema' : 'Donker thema',
+            icon: Icon(widget.isDarkMode ? Icons.light_mode : Icons.dark_mode),
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          // Search and filter section
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            child: Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    TextField(
+                      controller: _searchController,
+                      decoration: const InputDecoration(
+                        labelText: 'Zoek op titel of auteur',
+                        prefixIcon: Icon(Icons.search),
+                      ),
+                      onChanged: (value) => _filterBooks(),
+                    ),
+                    const SizedBox(height: 12),
+                    // Read status filter
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Lees status:',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF6D4C41),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              _buildFilterChip('Alle', 'all'),
+                              _buildFilterChip('Gelezen', 'read'),
+                              _buildFilterChip('Ongelezen', 'unread'),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // Genre/Type filter
+                    if (_allBooks.isNotEmpty)
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Text(
+                                  'Genre:',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF6D4C41),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                if (_typeFilter != null)
+                                  TextButton(
+                                    onPressed: () {
+                                      setState(() => _typeFilter = null);
+                                      _filterBooks();
+                                    },
+                                    style: TextButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                                      minimumSize: const Size(0, 24),
+                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    ),
+                                    child: const Text(
+                                      'Reset',
+                                      style: TextStyle(fontSize: 11),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: _getUniqueTypes().map((type) {
+                                final isSelected = _typeFilter == type;
+                                return ChoiceChip(
+                                  label: Text(type),
+                                  selected: isSelected,
+                                  onSelected: (selected) {
+                                    setState(() => _typeFilter = selected ? type : null);
+                                    _filterBooks();
+                                  },
+                                  selectedColor: const Color(0xFF8D6E63),
+                                  labelStyle: TextStyle(
+                                    color: isSelected ? Colors.white : Colors.black,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  side: const BorderSide(color: Color(0xFFE6E1D9)),
+                                );
+                              }).toList(),
+                            ),
+                          ],
+                        ),
+                      ),
+                    const SizedBox(height: 12),
+                    // Sort options
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Sorteren:',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF6D4C41),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              _buildSortChip('Standaard', 'none'),
+                              _buildSortChip('Titel (A-Z)', 'title'),
+                              _buildSortChip('Auteur (A-Z)', 'author'),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          
+          // Books list
+          Expanded(
+            child: _isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(
+                      color: Color(0xFF6D4C41),
+                    ),
+                  )
+                : _error != null
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text('Fout: $_error'),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed: _loadBooks,
+                              child: const Text('Opnieuw proberen'),
+                            ),
+                          ],
+                        ),
+                      )
+                    : _filteredBooks.isEmpty
+                        ? Center(
+                            child: Text(
+                              _searchController.text.isNotEmpty || _readFilter != 'all'
+                                  ? 'Geen boeken gevonden met deze filters'
+                                  : 'Geen boeken gevonden.\nTap op + om een boek toe te voegen.',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(fontSize: 16, color: Color(0xFF6D4C41)),
+                            ),
+                          )
+                        : RefreshIndicator(
+                            color: const Color(0xFF6D4C41),
+                            onRefresh: _loadBooks,
+                            child: ListView.builder(
+                              itemCount: _filteredBooks.length,
+                              itemBuilder: (context, index) {
+                                final book = _filteredBooks[index];
+                                return Card(
+                                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                  child: ExpansionTile(
+                                    tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                    childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    collapsedShape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    leading: book.coverUrl != null
+                                        ? ClipRRect(
+                                            borderRadius: BorderRadius.circular(10),
+                                            child: Image.network(
+                                              book.coverUrl!,
+                                              width: 48,
+                                              height: 64,
+                                              fit: BoxFit.cover,
+                                            ),
+                                          )
+                                        : CircleAvatar(
+                                            backgroundColor: const Color(0xFFEDE7E0),
+                                            child: Text(
+                                              book.title.isNotEmpty ? book.title[0].toUpperCase() : 'B',
+                                              style: const TextStyle(color: Color(0xFF6D4C41)),
+                                            ),
+                                          ),
+                                    title: Text(
+                                      book.title,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFF3E2723),
+                                      ),
+                                    ),
+                                    subtitle: Padding(
+                                      padding: const EdgeInsets.only(top: 6),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text('Auteur: ${book.author}'),
+                                          Text('Type: ${book.type}'),
+                                          Text(
+                                            'Locatie: ${book.cabinet != null ? 'Kast ${book.cabinet}, ' : ''}Plank ${book.shelf}, Positie ${book.position}',
+                                            style: const TextStyle(
+                                              color: Color(0xFF8D6E63),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Row(
+                                            children: [
+                                              Icon(
+                                                book.isRead ? Icons.check_circle : Icons.radio_button_unchecked,
+                                                size: 16,
+                                                color: book.isRead ? Colors.green : Colors.grey,
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Text(
+                                                book.isRead ? 'Gelezen' : 'Ongelezen',
+                                                style: TextStyle(
+                                                  color: book.isRead ? Colors.green : Colors.grey,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    children: [
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          if (book.isbn != null) Text('ISBN: ${book.isbn}'),
+                                          if (book.publisher != null) Text('Uitgever: ${book.publisher}'),
+                                          if (book.publicationDate != null)
+                                            Text('Publicatiedatum: ${book.publicationDate}'),
+                                          if (book.startDate != null) Text('Begonnen: ${book.startDate}'),
+                                          if (book.endDate != null) Text('Uitgelezen: ${book.endDate}'),
+                                          const SizedBox(height: 12),
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.end,
+                                            children: [
+                                              OutlinedButton.icon(
+                                                onPressed: () => _navigateToForm(book),
+                                                icon: const Icon(Icons.edit, size: 18),
+                                                label: const Text('Bewerken'),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              OutlinedButton.icon(
+                                                onPressed: () => _deleteBook(book.id!),
+                                                icon: const Icon(Icons.delete, size: 18),
+                                                label: const Text('Verwijderen'),
+                                                style: OutlinedButton.styleFrom(
+                                                  foregroundColor: Colors.red,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _navigateToForm(),
+        icon: const Icon(Icons.add),
+        label: const Text('Nieuw boek'),
+      ),
+    );
+  }
+}
