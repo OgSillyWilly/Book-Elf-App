@@ -31,7 +31,7 @@ class _BooksListScreenState extends State<BooksListScreen> {
   String? _typeFilter; // null = all types
   String _sortBy = 'none'; // 'none', 'title', 'author'
   bool _isSelectionMode = false;
-  Set<int> _selectedBookIds = {};
+  final Set<int> _selectedBookIds = {};
 
   @override
   void initState() {
@@ -364,7 +364,7 @@ class _BooksListScreenState extends State<BooksListScreen> {
                         // Status dropdown
                         Expanded(
                           child: DropdownButtonFormField<String>(
-                            value: _readFilter,
+                            initialValue: _readFilter,
                             decoration: const InputDecoration(
                               labelText: 'Status',
                               prefixIcon: Icon(Icons.check_circle_outline, size: 20),
@@ -389,7 +389,7 @@ class _BooksListScreenState extends State<BooksListScreen> {
                         // Genre dropdown
                         Expanded(
                           child: DropdownButtonFormField<String?>(
-                            value: _typeFilter,
+                            initialValue: _typeFilter,
                             decoration: const InputDecoration(
                               labelText: 'Genre',
                               prefixIcon: Icon(Icons.category_outlined, size: 20),
@@ -413,7 +413,7 @@ class _BooksListScreenState extends State<BooksListScreen> {
                         // Sort dropdown
                         Expanded(
                           child: DropdownButtonFormField<String>(
-                            value: _sortBy,
+                            initialValue: _sortBy,
                             decoration: const InputDecoration(
                               labelText: 'Sort',
                               prefixIcon: Icon(Icons.sort, size: 20),
@@ -650,7 +650,7 @@ class _BooksListScreenState extends State<BooksListScreen> {
           _loadBooks(); // Reload books after import
         }
       }
-    } on StateError catch (e) {
+    } on StateError {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
