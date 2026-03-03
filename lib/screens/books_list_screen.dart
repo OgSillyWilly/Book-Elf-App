@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../models/book.dart';
 import '../services/api_service.dart';
 import 'book_form_screen.dart';
@@ -481,6 +482,8 @@ class _BooksListScreenState extends State<BooksListScreen> {
                               itemCount: _filteredBooks.length,
                               itemBuilder: (context, index) {
                                 final book = _filteredBooks[index];
+                                if (book.id == null) return const SizedBox.shrink();
+                                
                                 return InkWell(
                                   onTap: _isSelectionMode
                                       ? () => _toggleBookSelection(book.id!)
@@ -505,14 +508,34 @@ class _BooksListScreenState extends State<BooksListScreen> {
                                               _toggleBookSelection(book.id!);
                                             },
                                           )
-                                        : book.coverUrl != null
+                                        : book.coverUrl != null && book.coverUrl!.isNotEmpty
                                         ? ClipRRect(
                                             borderRadius: BorderRadius.circular(10),
-                                            child: Image.network(
-                                              book.coverUrl!,
+                                            child: CachedNetworkImage(
+                                              imageUrl: book.coverUrl!,
                                               width: 48,
                                               height: 64,
                                               fit: BoxFit.cover,
+                                              placeholder: (context, url) => SizedBox(
+                                                width: 48,
+                                                height: 64,
+                                                child: Center(
+                                                  child: CircularProgressIndicator(
+                                                    strokeWidth: 2,
+                                                    color: Theme.of(context).colorScheme.primary,
+                                                  ),
+                                                ),
+                                              ),
+                                              errorWidget: (context, url, error) => CircleAvatar(
+                                                backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                                                child: Icon(
+                                                  Icons.broken_image,
+                                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                                  size: 20,
+                                                ),
+                                              ),
+                                              fadeInDuration: const Duration(milliseconds: 300),
+                                              fadeOutDuration: const Duration(milliseconds: 100),
                                             ),
                                           )
                                         : CircleAvatar(

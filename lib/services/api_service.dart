@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/book.dart';
+import '../config/app_config.dart';
 
 class ApiService {
   static String? _cachedBaseUrl;
@@ -19,15 +20,8 @@ class ApiService {
       return customUrl;
     }
     
-    // Default URLs
-    if (kIsWeb) {
-      // Web/Chrome: gebruik localhost
-      _cachedBaseUrl = 'http://127.0.0.1:8000/api';
-    } else {
-      // iPhone/Android: gebruik netwerk IP
-      // Pas dit aan naar je Mac IP adres (check met: ifconfig | grep "inet ")
-      _cachedBaseUrl = 'http://10.242.187.102:8000/api';
-    }
+    // Use AppConfig for platform-specific URLs
+    _cachedBaseUrl = AppConfig.apiBaseUrl;
     
     return _cachedBaseUrl!;
   }

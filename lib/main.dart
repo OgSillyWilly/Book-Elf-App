@@ -2,9 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/books_list_screen.dart';
 import 'screens/splash_screen.dart';
+import 'config/app_config.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Load environment configuration
+  await AppConfig.load();
+  
   runApp(const MyApp());
 }
 
