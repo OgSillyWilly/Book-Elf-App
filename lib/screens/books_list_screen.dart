@@ -470,25 +470,12 @@ class _BooksListScreenState extends State<BooksListScreen> {
                           ),
                         ),
                         const SizedBox(width: 8),
-                            items: [
-                              const DropdownMenuItem(value: null, child: Text('Alle', overflow: TextOverflow.ellipsis)),
-                              ..._getUniqueTypes().map((type) =>
-                                DropdownMenuItem(value: type, child: Text(type, overflow: TextOverflow.ellipsis)),
-                              ),
-                            ],
-                            onChanged: (value) {
-                              setState(() => _typeFilter = value);
-                              _filterBooks();
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 8),
                         // Sort dropdown
                         Expanded(
                           child: DropdownButtonFormField<String>(
                             initialValue: _sortBy,
                             decoration: const InputDecoration(
-                              labelText: 'Sort',
+                              labelText: 'Sorteer',
                               prefixIcon: Icon(Icons.sort, size: 20),
                               contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                               isDense: true,

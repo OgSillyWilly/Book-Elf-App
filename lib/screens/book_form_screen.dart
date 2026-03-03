@@ -71,9 +71,17 @@ class _BookFormScreenState extends State<BookFormScreen> {
 
   Future<void> _selectDate(TextEditingController controller) async {
     DateTime? initialDate;
+    final DateTime minDate = DateTime(1900);
+    final DateTime maxDate = DateTime(2100);
+    
     try {
       if (controller.text.isNotEmpty) {
-        initialDate = DateFormat('dd-MM-yyyy').parse(controller.text);
+        final parsed = DateFormat('dd-MM-yyyy').parse(controller.text);
+        // Only use parsed date if it's within valid range
+        if (parsed.isAfter(minDate.subtract(const Duration(days: 1))) && 
+            parsed.isBefore(maxDate.add(const Duration(days: 1)))) {
+          initialDate = parsed;
+        }
       }
     } catch (e) {
       initialDate = null;
@@ -82,8 +90,8 @@ class _BookFormScreenState extends State<BookFormScreen> {
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: initialDate ?? DateTime.now(),
-      firstDate: DateTime(1900),
-      lastDate: DateTime(2100),
+      firstDate: minDate,
+      lastDate: maxDate,
     );
 
     if (picked != null) {

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../models/book.dart';
-import 'book_detail_screen.dart';
 
 class ReadingHistoryScreen extends StatefulWidget {
   const ReadingHistoryScreen({super.key});
@@ -211,14 +210,6 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
               ],
             ),
             isThreeLine: book.endDate != null,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => BookDetailScreen(book: book),
-                ),
-              );
-            },
           ),
         );
       },
