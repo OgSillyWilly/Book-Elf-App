@@ -158,4 +158,46 @@ class ApiService {
     final url = await getBaseUrl();
     return '$url/books/template/download';
   }
+
+  Future<List<Book>> getBooksByYear(int year) async {
+    try {
+      final url = await getBaseUrl();
+      final response = await http.get(
+        Uri.parse('$url/books?year_read=$year'),
+      ).timeout(timeout);
+      
+      if (response.statusCode == 200) {
+        List<dynamic> data = json.decode(response.body);
+        return data.map((json) => Book.fromJson(json)).toList();
+      } else {
+        throw Exception('Server antwoordde met status ${response.statusCode}');
+      }
+    } on TimeoutException {
+      final url = await getBaseUrl();
+      throw Exception('Verbinding timeout - controleer of de server draait op $url');
+    } catch (e) {
+      throw Exception('Verbindingsfout: ${e.toString()}');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getReadingHistory() async {
+    try {
+      final url = await getBaseUrl();
+      final response = await http.get(
+        Uri.parse('$url/books/reading-history'),
+      ).timeout(timeout);
+      
+      if (response.statusCode == 200) {
+        List<dynamic> data = json.decode(response.body);
+        return data.cast<Map<String, dynamic>>();
+      } else {
+        throw Exception('Server antwoordde met status ${response.statusCode}');
+      }
+    } on TimeoutException {
+      final url = await getBaseUrl();
+      throw Exception('Verbinding timeout - controleer of de server draait op $url');
+    } catch (e) {
+      throw Exception('Verbindingsfout: ${e.toString()}');
+    }
+  }
 }

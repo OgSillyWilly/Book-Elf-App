@@ -27,6 +27,7 @@ class _BookFormScreenState extends State<BookFormScreen> {
   final _positionController = TextEditingController();
   final _startDateController = TextEditingController();
   final _endDateController = TextEditingController();
+  final _yearReadController = TextEditingController();
   final ApiService _apiService = ApiService();
   
   String _selectedType = 'boek';
@@ -111,6 +112,7 @@ class _BookFormScreenState extends State<BookFormScreen> {
       _hasDustjacket = widget.book!.hasDustjacket;
       _startDateController.text = _formatDateForDisplay(widget.book!.startDate);
       _endDateController.text = _formatDateForDisplay(widget.book!.endDate);
+      _yearReadController.text = widget.book!.yearRead?.toString() ?? '';
     }
   }
 
@@ -126,6 +128,7 @@ class _BookFormScreenState extends State<BookFormScreen> {
     _positionController.dispose();
     _startDateController.dispose();
     _endDateController.dispose();
+    _yearReadController.dispose();
     super.dispose();
   }
 
@@ -236,6 +239,18 @@ class _BookFormScreenState extends State<BookFormScreen> {
         }
       }
 
+      // Parse year_read - only validate if not empty
+      int? yearRead;
+      if (_yearReadController.text.isNotEmpty) {
+        yearRead = int.tryParse(_yearReadController.text);
+        if (yearRead == null) {
+          throw Exception('Jaar gelezen moet een getal zijn');
+        }
+        if (yearRead < 1900 || yearRead > 2100) {
+          throw Exception('Jaar gelezen moet tussen 1900 en 2100 liggen');
+        }
+      }
+
       final bookData = {
         'title': _titleController.text,
         'author': _authorController.text,
@@ -252,6 +267,7 @@ class _BookFormScreenState extends State<BookFormScreen> {
         'is_read': _isRead ? 1 : 0,
         'start_date': _startDateController.text.isEmpty ? null : _formatDateForApi(_startDateController.text),
         'end_date': _endDateController.text.isEmpty ? null : _formatDateForApi(_endDateController.text),
+        'year_read': yearRead,
       };
 
       if (widget.book == null) {
@@ -560,6 +576,18 @@ class _BookFormScreenState extends State<BookFormScreen> {
                       filled: true,
                       border: OutlineInputBorder(),
                       suffixIcon: Icon(Icons.calendar_today),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  TextFormField(
+                    controller: _yearReadController,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: 'Jaar gelezen (JJJJ)',
+                      filled: true,
+                      border: OutlineInputBorder(),
+                      hintText: 'Bijv. 2024',
                     ),
                   ),
                   const SizedBox(height: 24),

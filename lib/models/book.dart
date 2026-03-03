@@ -15,6 +15,7 @@ class Book {
   final bool isRead;
   final String? startDate;
   final String? endDate;
+  final int? yearRead;
 
   Book({
     this.id,
@@ -33,6 +34,7 @@ class Book {
     this.isRead = false,
     this.startDate,
     this.endDate,
+    this.yearRead,
   });
 
   factory Book.fromJson(Map<String, dynamic> json) {
@@ -72,6 +74,7 @@ class Book {
       isRead: parseBoolSafely(json['is_read']),
       startDate: json['start_date']?.toString(),
       endDate: json['end_date']?.toString(),
+      yearRead: parseIntSafely(json['year_read']),
     );
   }
 
@@ -92,6 +95,7 @@ class Book {
       'is_read': isRead,
       'start_date': startDate,
       'end_date': endDate,
+      'year_read': yearRead,
     };
   }
 }

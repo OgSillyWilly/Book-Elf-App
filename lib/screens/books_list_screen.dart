@@ -5,6 +5,7 @@ import '../models/book.dart';
 import '../services/api_service.dart';
 import 'book_form_screen.dart';
 import 'settings_screen.dart';
+import 'reading_history_screen.dart';
 
 class BooksListScreen extends StatefulWidget {
   const BooksListScreen({
@@ -30,6 +31,7 @@ class _BooksListScreenState extends State<BooksListScreen> {
   String? _error;
   String _readFilter = 'all'; // 'all', 'read', 'unread'
   String? _typeFilter; // null = all types
+  int? _yearFilter; // null = all years
   String _sortBy = 'none'; // 'none', 'title', 'author'
   bool _isSelectionMode = false;
   final Set<int> _selectedBookIds = {};
@@ -82,7 +84,10 @@ class _BooksListScreenState extends State<BooksListScreen> {
         final matchesTypeFilter = _typeFilter == null ||
             book.type == _typeFilter;
         
-        return matchesSearch && matchesReadFilter && matchesTypeFilter;
+        final matchesYearFilter = _yearFilter == null ||
+            book.yearRead == _yearFilter;
+        
+        return matchesSearch && matchesReadFilter && matchesTypeFilter && matchesYearFilter;
       }).toList();
       
       // Apply sorting
@@ -98,6 +103,16 @@ class _BooksListScreenState extends State<BooksListScreen> {
     final types = _allBooks.map((book) => book.type).toSet().toList();
     types.sort();
     return types;
+  }
+
+  List<int> _getUniqueYears() {
+    final years = _allBooks
+        .where((book) => book.yearRead != null)
+        .map((book) => book.yearRead!)
+        .toSet()
+        .toList();
+    years.sort((a, b) => b.compareTo(a)); // Descending order (newest first)
+    return years;
   }
 
   Future<void> _deleteBook(int id) async {
@@ -307,9 +322,24 @@ class _BooksListScreenState extends State<BooksListScreen> {
                         context,
                         MaterialPageRoute(builder: (context) => const SettingsScreen()),
                       );
+                    } else if (value == 'history') {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const ReadingHistoryScreen()),
+                      );
                     }
                   },
                   itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'history',
+                      child: Row(
+                        children: [
+                          Icon(Icons.history),
+                          SizedBox(width: 8),
+                          Text('Leesgeschiedenis'),
+                        ],
+                      ),
+                    ),
                     const PopupMenuItem(
                       value: 'settings',
                       child: Row(
@@ -359,7 +389,7 @@ class _BooksListScreenState extends State<BooksListScreen> {
                       onChanged: (value) => _filterBooks(),
                     ),
                     const SizedBox(height: 16),
-                    // Compact filter dropdowns
+                    // Compact filter dropdowns - Row 1
                     Row(
                       children: [
                         // Status dropdown
@@ -398,6 +428,48 @@ class _BooksListScreenState extends State<BooksListScreen> {
                               isDense: true,
                             ),
                             isExpanded: true,
+                            items: [
+                              const DropdownMenuItem(value: null, child: Text('Alle', overflow: TextOverflow.ellipsis)),
+                              ..._getUniqueTypes().map((type) =>
+                                DropdownMenuItem(value: type, child: Text(type, overflow: TextOverflow.ellipsis)),
+                              ),
+                            ],
+                            onChanged: (value) {
+                              setState(() => _typeFilter = value);
+                              _filterBooks();
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    // Compact filter dropdowns - Row 2
+                    Row(
+                      children: [
+                        // Year filter dropdown
+                        Expanded(
+                          child: DropdownButtonFormField<int?>(
+                            value: _yearFilter,
+                            decoration: const InputDecoration(
+                              labelText: 'Jaar gelezen',
+                              prefixIcon: Icon(Icons.calendar_today, size: 20),
+                              contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                              isDense: true,
+                            ),
+                            isExpanded: true,
+                            items: [
+                              const DropdownMenuItem(value: null, child: Text('Alle', overflow: TextOverflow.ellipsis)),
+                              ..._getUniqueYears().map((year) =>
+                                DropdownMenuItem(value: year, child: Text(year.toString(), overflow: TextOverflow.ellipsis)),
+                              ),
+                            ],
+                            onChanged: (value) {
+                              setState(() => _yearFilter = value);
+                              _filterBooks();
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
                             items: [
                               const DropdownMenuItem(value: null, child: Text('Alle', overflow: TextOverflow.ellipsis)),
                               ..._getUniqueTypes().map((type) =>
