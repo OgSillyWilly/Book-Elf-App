@@ -97,6 +97,11 @@ class _BookFormScreenState extends State<BookFormScreen> {
     if (picked != null) {
       setState(() {
         controller.text = DateFormat('dd-MM-yyyy').format(picked);
+        
+        // Automatisch jaar invullen als dit de einddatum is
+        if (controller == _endDateController) {
+          _yearReadController.text = picked.year.toString();
+        }
       });
     }
   }
@@ -125,7 +130,18 @@ class _BookFormScreenState extends State<BookFormScreen> {
       _hasDustjacket = widget.book!.hasDustjacket;
       _startDateController.text = _formatDateForDisplay(widget.book!.startDate);
       _endDateController.text = _formatDateForDisplay(widget.book!.endDate);
-      _yearReadController.text = widget.book!.yearRead?.toString() ?? '';
+      
+      // Automatisch jaar invullen uit einddatum als year_read niet is ingevuld
+      if (widget.book!.yearRead != null) {
+        _yearReadController.text = widget.book!.yearRead.toString();
+      } else if (widget.book!.endDate != null && widget.book!.endDate!.isNotEmpty) {
+        try {
+          final endDate = DateTime.parse(widget.book!.endDate!);
+          _yearReadController.text = endDate.year.toString();
+        } catch (e) {
+          _yearReadController.text = '';
+        }
+      }
     }
   }
 
@@ -602,7 +618,9 @@ class _BookFormScreenState extends State<BookFormScreen> {
                       labelText: 'Jaar gelezen (JJJJ)',
                       filled: true,
                       border: OutlineInputBorder(),
-                      hintText: 'Bijv. 2024',
+                      hintText: 'Wordt automatisch ingevuld vanuit einddatum',
+                      helperText: 'Vult zich automatisch bij het kiezen van einddatum',
+                      helperMaxLines: 2,
                     ),
                   ),
                   const SizedBox(height: 24),
