@@ -27,7 +27,6 @@ class _BookFormScreenState extends State<BookFormScreen> {
   final _positionController = TextEditingController();
   final _startDateController = TextEditingController();
   final _endDateController = TextEditingController();
-  final _yearReadController = TextEditingController();
   final ApiService _apiService = ApiService();
   
   String _selectedType = 'boek';
@@ -97,11 +96,6 @@ class _BookFormScreenState extends State<BookFormScreen> {
     if (picked != null) {
       setState(() {
         controller.text = DateFormat('dd-MM-yyyy').format(picked);
-        
-        // Automatisch jaar invullen als dit de einddatum is
-        if (controller == _endDateController) {
-          _yearReadController.text = picked.year.toString();
-        }
       });
     }
   }
@@ -130,18 +124,6 @@ class _BookFormScreenState extends State<BookFormScreen> {
       _hasDustjacket = widget.book!.hasDustjacket;
       _startDateController.text = _formatDateForDisplay(widget.book!.startDate);
       _endDateController.text = _formatDateForDisplay(widget.book!.endDate);
-      
-      // Automatisch jaar invullen uit einddatum als year_read niet is ingevuld
-      if (widget.book!.yearRead != null) {
-        _yearReadController.text = widget.book!.yearRead.toString();
-      } else if (widget.book!.endDate != null && widget.book!.endDate!.isNotEmpty) {
-        try {
-          final endDate = DateTime.parse(widget.book!.endDate!);
-          _yearReadController.text = endDate.year.toString();
-        } catch (e) {
-          _yearReadController.text = '';
-        }
-      }
     }
   }
 
@@ -157,7 +139,6 @@ class _BookFormScreenState extends State<BookFormScreen> {
     _positionController.dispose();
     _startDateController.dispose();
     _endDateController.dispose();
-    _yearReadController.dispose();
     super.dispose();
   }
 
@@ -268,15 +249,15 @@ class _BookFormScreenState extends State<BookFormScreen> {
         }
       }
 
-      // Parse year_read - only validate if not empty
+      // Automatisch jaar extraheren uit einddatum
       int? yearRead;
-      if (_yearReadController.text.isNotEmpty) {
-        yearRead = int.tryParse(_yearReadController.text);
-        if (yearRead == null) {
-          throw Exception('Jaar gelezen moet een getal zijn');
-        }
-        if (yearRead < 1900 || yearRead > 2100) {
-          throw Exception('Jaar gelezen moet tussen 1900 en 2100 liggen');
+      if (_endDateController.text.isNotEmpty) {
+        try {
+          final endDate = DateFormat('dd-MM-yyyy').parse(_endDateController.text);
+          yearRead = endDate.year;
+        } catch (e) {
+          // Als einddatum niet geparsed kan worden, blijft yearRead null
+          yearRead = null;
         }
       }
 
@@ -607,20 +588,7 @@ class _BookFormScreenState extends State<BookFormScreen> {
                       filled: true,
                       border: OutlineInputBorder(),
                       suffixIcon: Icon(Icons.calendar_today),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  TextFormField(
-                    controller: _yearReadController,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      labelText: 'Jaar gelezen (JJJJ)',
-                      filled: true,
-                      border: OutlineInputBorder(),
-                      hintText: 'Wordt automatisch ingevuld vanuit einddatum',
-                      helperText: 'Vult zich automatisch bij het kiezen van einddatum',
-                      helperMaxLines: 2,
+                      helperText: 'Jaar gelezen wordt automatisch bepaald vanuit deze datum',
                     ),
                   ),
                   const SizedBox(height: 24),
