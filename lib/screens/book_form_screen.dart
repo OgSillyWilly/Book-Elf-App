@@ -108,7 +108,12 @@ class _BookFormScreenState extends State<BookFormScreen> {
       _titleController.text = widget.book!.title;
       _authorController.text = widget.book!.author;
       _isbnController.text = widget.book!.isbn ?? '';
-      _selectedType = widget.book!.type;
+      // Ensure selected type is in the list, otherwise use default
+      if (_bookTypes.contains(widget.book!.type)) {
+        _selectedType = widget.book!.type;
+      } else {
+        _selectedType = 'boek'; // fallback to default
+      }
       _publisherController.text = widget.book!.publisher ?? '';
       _publicationDateController.text = _formatDateForDisplay(widget.book!.publicationDate);
       _coverUrl = widget.book!.coverUrl;
@@ -463,7 +468,7 @@ class _BookFormScreenState extends State<BookFormScreen> {
                   const SizedBox(height: 16),
 
                   DropdownButtonFormField<String>(
-                    initialValue: _selectedType,
+                    value: _selectedType,
                     decoration: InputDecoration(
                       labelText: 'Type *',
                       filled: true,
@@ -473,7 +478,9 @@ class _BookFormScreenState extends State<BookFormScreen> {
                       return DropdownMenuItem(value: type, child: Text(type));
                     }).toList(),
                     onChanged: (value) {
-                      setState(() => _selectedType = value!);
+                      if (value != null) {
+                        setState(() => _selectedType = value);
+                      }
                     },
                   ),
                   const SizedBox(height: 16),
