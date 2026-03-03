@@ -84,8 +84,16 @@ class _BooksListScreenState extends State<BooksListScreen> {
         final matchesTypeFilter = _typeFilter == null ||
             book.type == _typeFilter;
         
-        final matchesYearFilter = _yearFilter == null ||
-            book.yearRead == _yearFilter;
+        // Extract year from endDate for filtering
+        bool matchesYearFilter = _yearFilter == null;
+        if (_yearFilter != null && book.endDate != null && book.endDate!.isNotEmpty) {
+          try {
+            final date = DateTime.parse(book.endDate!);
+            matchesYearFilter = date.year == _yearFilter;
+          } catch (e) {
+            matchesYearFilter = false;
+          }
+        }
         
         return matchesSearch && matchesReadFilter && matchesTypeFilter && matchesYearFilter;
       }).toList();
@@ -107,8 +115,17 @@ class _BooksListScreenState extends State<BooksListScreen> {
 
   List<int> _getUniqueYears() {
     final years = _allBooks
-        .where((book) => book.yearRead != null)
-        .map((book) => book.yearRead!)
+        .where((book) => book.endDate != null && book.endDate!.isNotEmpty)
+        .map((book) {
+          try {
+            final date = DateTime.parse(book.endDate!);
+            return date.year;
+          } catch (e) {
+            return null;
+          }
+        })
+        .where((year) => year != null)
+        .cast<int>()
         .toSet()
         .toList();
     years.sort((a, b) => b.compareTo(a)); // Descending order (newest first)
@@ -466,6 +483,25 @@ class _BooksListScreenState extends State<BooksListScreen> {
                             onChanged: (value) {
                               setState(() => _yearFilter = value);
                               _filterBooks();
+                              
+                              // Toon dialoog als er geen boeken zijn voor het geselecteerde jaar
+                              if (value != null && _filteredBooks.isEmpty) {
+                                Future.delayed(Duration.zero, () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (context) => AlertDialog(
+                                      title: const Text('Geen boeken'),
+                                      content: Text('Geen boeken gelezen in $value'),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(context),
+                                          child: const Text('OK'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                });
+                              }
                             },
                           ),
                         ),
