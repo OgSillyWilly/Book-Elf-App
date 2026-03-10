@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/book.dart';
 import '../services/api_service.dart';
+import '../utils/error_dialog.dart';
+import '../widgets/cover_image.dart';
 
 class BookFormScreen extends StatefulWidget {
   final Book? book;
@@ -27,6 +29,7 @@ class _BookFormScreenState extends State<BookFormScreen> {
   final _positionController = TextEditingController();
   final _startDateController = TextEditingController();
   final _endDateController = TextEditingController();
+  final _coverUrlController = TextEditingController();
   final ApiService _apiService = ApiService();
   
   String _selectedType = 'boek';
@@ -38,6 +41,7 @@ class _BookFormScreenState extends State<BookFormScreen> {
   List<Map<String, dynamic>> _searchResults = [];
   bool _showSearchResults = false;
   String _selectedLanguage = 'nl';
+  String _searchType = 'title'; // title, author, isbn, all
 
   final List<String> _bookTypes = [
     'boek',
@@ -51,8 +55,19 @@ class _BookFormScreenState extends State<BookFormScreen> {
   String _formatDateForDisplay(String? date) {
     if (date == null || date.isEmpty) return '';
     try {
-      final parsedDate = DateTime.parse(date);
-      return DateFormat('dd-MM-yyyy').format(parsedDate);
+      // Google Books kan "2015", "2015-12" of "2015-12-08" retourneren
+      if (date.length == 4) {
+        // Alleen jaar: "2015" -> "01-01-2015"
+        return '01-01-$date';
+      } else if (date.length == 7) {
+        // Jaar-maand: "2015-12" -> "01-12-2015"
+        final parts = date.split('-');
+        return '01-${parts[1]}-${parts[0]}';
+      } else {
+        // Volledige datum parsen
+        final parsedDate = DateTime.parse(date);
+        return DateFormat('dd-MM-yyyy').format(parsedDate);
+      }
     } catch (e) {
       return date;
     }
@@ -61,11 +76,25 @@ class _BookFormScreenState extends State<BookFormScreen> {
   String _formatDateForApi(String? date) {
     if (date == null || date.isEmpty) return '';
     try {
+      // Probeer eerst dd-MM-yyyy formaat (van display)
       final parsedDate = DateFormat('dd-MM-yyyy').parse(date);
       return DateFormat('yyyy-MM-dd').format(parsedDate);
     } catch (e) {
-      return date;
+      // Als dat faalt, check of het al een geldig yyyy-MM-dd formaat is
+      try {
+        final parsedDate = DateTime.parse(date);
+        return DateFormat('yyyy-MM-dd').format(parsedDate);
+      } catch (e2) {
+        // Als niets werkt, retourneer lege string in plaats van ongeldige datum
+        return '';
+      }
     }
+  }
+
+  String? _formatDateForApiOrNull(String text) {
+    if (text.isEmpty) return null;
+    final formatted = _formatDateForApi(text);
+    return formatted.isEmpty ? null : formatted;
   }
 
   Future<void> _selectDate(TextEditingController controller) async {
@@ -116,6 +145,7 @@ class _BookFormScreenState extends State<BookFormScreen> {
       _publisherController.text = widget.book!.publisher ?? '';
       _publicationDateController.text = _formatDateForDisplay(widget.book!.publicationDate);
       _coverUrl = widget.book!.coverUrl;
+      _coverUrlController.text = widget.book!.coverUrl ?? '';
       _cabinetController.text = widget.book!.cabinet ?? '';
       _shelfController.text = widget.book!.shelf ?? '';
       _positionController.text = widget.book!.position?.toString() ?? '';
@@ -136,6 +166,7 @@ class _BookFormScreenState extends State<BookFormScreen> {
     _publicationDateController.dispose();
     _cabinetController.dispose();
     _shelfController.dispose();
+    _coverUrlController.dispose();
     _positionController.dispose();
     _startDateController.dispose();
     _endDateController.dispose();
@@ -146,7 +177,7 @@ class _BookFormScreenState extends State<BookFormScreen> {
     final query = _titleController.text.trim();
     if (query.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Voer een titel in om te zoeken')),
+        const SnackBar(content: Text('Voer een zoekterm in')),
       );
       return;
     }
@@ -157,26 +188,94 @@ class _BookFormScreenState extends State<BookFormScreen> {
     });
 
     try {
-      final allResults = <Map<String, dynamic>>[];
-      const maxResults = 40;
-      const resultsPerRequest = 40;
+      // Laad API key indien beschikbaar
+      final prefs = await SharedPreferences.getInstance();
+      final apiKey = prefs.getString('google_books_api_key');
       
-      for (int startIndex = 0; startIndex < maxResults; startIndex += resultsPerRequest) {
-        final url = Uri.parse(
-          'https://www.googleapis.com/books/v1/volumes?q=$query&langRestrict=$_selectedLanguage&maxResults=$resultsPerRequest&startIndex=$startIndex'
-        );
+      final allResults = <Map<String, dynamic>>[];
+      const resultsPerRequest = 40; // Gevraagd aantal (API geeft max ~20)
+      const maxTotalResults = 200; // Limiet om niet te lang te wachten
+      const maxPages = 10; // Maximum aantal pagina's (10 x 20 = 200 resultaten)
+      int pageCount = 0;
+      int? totalAvailable;
+      
+      // Bouw de juiste query op basis van zoektype
+      String searchQuery;
+      final authorText = _authorController.text.trim();
+      
+      switch (_searchType) {
+        case 'title':
+          // Voor korte titels (< 3 tekens) of algemene woorden, combineer met auteur indien beschikbaar
+          if (query.length <= 2 || ['it', 'if', 'go', 'on'].contains(query.toLowerCase())) {
+            if (authorText.isNotEmpty) {
+              // Combineer titel + auteur voor betere resultaten
+              searchQuery = 'intitle:${Uri.encodeComponent(query)}+inauthor:${Uri.encodeComponent(authorText)}';
+            } else {
+              // Als geen auteur, gebruik algemene zoekterm
+              searchQuery = Uri.encodeComponent(query);
+            }
+          } else {
+            searchQuery = 'intitle:${Uri.encodeComponent(query)}';
+          }
+          break;
+        case 'author':
+          searchQuery = 'inauthor:${Uri.encodeComponent(query)}';
+          break;
+        case 'isbn':
+          searchQuery = 'isbn:${Uri.encodeComponent(query)}';
+          break;
+        case 'all':
+        default:
+          searchQuery = Uri.encodeComponent(query);
+          break;
+      }
+      
+      // Loop door pagina's om alle beschikbare resultaten op te halen
+      while (allResults.length < maxTotalResults && pageCount < maxPages) {
+        final startIndex = pageCount * resultsPerRequest;
         
-        final response = await http.get(url);
+        // Bouw URL met optionele API key
+        var urlString = 'https://www.googleapis.com/books/v1/volumes?q=$searchQuery&langRestrict=$_selectedLanguage&maxResults=$resultsPerRequest&startIndex=$startIndex';
+        if (apiKey != null && apiKey.isNotEmpty) {
+          urlString += '&key=$apiKey';
+        }
+        final url = Uri.parse(urlString);
+        
+        final response = await http.get(url).timeout(const Duration(seconds: 10));
         
         if (response.statusCode == 200) {
           final data = json.decode(response.body);
           final items = data['items'] as List<dynamic>?;
           
+          // Haal het totaal aantal beschikbare resultaten op (eerste keer)
+          if (totalAvailable == null && data['totalItems'] != null) {
+            totalAvailable = data['totalItems'] as int;
+          }
+          
+          // Voeg resultaten toe
           if (items != null && items.isNotEmpty) {
             allResults.addAll(items.cast<Map<String, dynamic>>());
+            pageCount++;
+            
+            // Als we alle beschikbare resultaten hebben opgehaald
+            if (totalAvailable != null && allResults.length >= totalAvailable) {
+              break;
+            }
+            
+            // Kleine pauze tussen requests om rate limiting te vermijden
+            if (pageCount < maxPages) {
+              await Future.delayed(const Duration(milliseconds: 100));
+            }
           } else {
+            // Geen items in deze response, stop
             break;
           }
+        } else if (response.statusCode == 429) {
+          // Rate limit bereikt
+          break;
+        } else {
+          // Andere fout, stop
+          break;
         }
       }
 
@@ -192,13 +291,47 @@ class _BookFormScreenState extends State<BookFormScreen> {
             const SnackBar(content: Text('Geen boeken gevonden')),
           );
         }
+      } else if (mounted) {
+        // Toon aantal gevonden resultaten
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${allResults.length} resultaten gevonden${totalAvailable != null && allResults.length < totalAvailable ? ' (van ${totalAvailable} totaal)' : ''}'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
       }
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Fout bij zoeken: $e')),
-        );
+        // Specifieke foutmelding voor Google Books API problemen
+        String title = 'Fout bij zoeken';
+        String message;
+        
+        if (e.toString().contains('429') || e.toString().contains('quota') || 
+            e.toString().contains('rate limit') || e.toString().contains('RATE_LIMIT_EXCEEDED')) {
+          title = 'Google Books dagelijks quota bereikt';
+          message = 'Het dagelijkse zoeklimiet van Google Books is bereikt.\n\n'
+                   'Dit reset automatisch om middernacht (UTC). '
+                   'Je kunt nu het boek handmatig toevoegen door de velden hieronder in te vullen.';
+        } else if (e.toString().contains('503') || e.toString().contains('Service Unavailable')) {
+          title = 'Google Books tijdelijk niet beschikbaar';
+          message = 'De Google Books service is momenteel overbelast of in onderhoud.\n\n'
+                   'Probeer het over een paar minuten opnieuw, of voeg het boek handmatig toe door de velden hieronder in te vullen.';
+        } else if (e.toString().contains('TimeoutException') || e.toString().contains('timed out')) {
+          title = 'Verbinding verlopen';
+          message = 'De verbinding met Google Books duurde te lang.\n\n'
+                   'Controleer je internetverbinding en probeer opnieuw.';
+        } else if (e.toString().contains('SocketException') || e.toString().contains('Failed host lookup')) {
+          title = 'Geen internetverbinding';
+          message = 'Kan geen verbinding maken met Google Books.\n\n'
+                   'Controleer je internetverbinding.';
+        } else {
+          message = 'Er is een fout opgetreden bij het zoeken naar boeken.\n\n'
+                   'Je kunt het boek ook handmatig toevoegen door de velden hieronder in te vullen.\n\n'
+                   'Technische details: $e';
+        }
+        
+        showErrorDialog(context, title, message);
       }
     }
   }
@@ -223,7 +356,12 @@ class _BookFormScreenState extends State<BookFormScreen> {
     final imageLinks = volumeInfo['imageLinks'] as Map<String, dynamic>?;
     final rawCoverUrl = imageLinks?['thumbnail'] ?? imageLinks?['smallThumbnail'];
     if (rawCoverUrl is String) {
-      _coverUrl = rawCoverUrl.replaceFirst('http://', 'https://');
+      // Zorg dat het HTTPS is en verwijder edge curl parameter voor betere kwaliteit
+      var cleanUrl = rawCoverUrl.replaceFirst('http://', 'https://');
+      cleanUrl = cleanUrl.replaceAll('&edge=curl', '');
+      cleanUrl = cleanUrl.replaceAll('edge=curl', '');
+      _coverUrl = cleanUrl;
+      _coverUrlController.text = cleanUrl;
     }
 
     setState(() {
@@ -267,7 +405,7 @@ class _BookFormScreenState extends State<BookFormScreen> {
         'isbn': _isbnController.text.isEmpty ? null : _isbnController.text,
         'type': _selectedType,
         'publisher': _publisherController.text.isEmpty ? null : _publisherController.text,
-        'publication_date': _publicationDateController.text.isEmpty ? null : _formatDateForApi(_publicationDateController.text),
+        'publication_date': _formatDateForApiOrNull(_publicationDateController.text),
         'cover_url': _coverUrl,
         'has_slipcase': _hasSlipcase ? 1 : 0,
         'has_dustjacket': _hasDustjacket ? 1 : 0,
@@ -275,8 +413,8 @@ class _BookFormScreenState extends State<BookFormScreen> {
         'shelf': _shelfController.text.isEmpty ? null : _shelfController.text,
         'position': position,
         'is_read': _isRead ? 1 : 0,
-        'start_date': _startDateController.text.isEmpty ? null : _formatDateForApi(_startDateController.text),
-        'end_date': _endDateController.text.isEmpty ? null : _formatDateForApi(_endDateController.text),
+        'start_date': _formatDateForApiOrNull(_startDateController.text),
+        'end_date': _formatDateForApiOrNull(_endDateController.text),
         'year_read': yearRead,
       };
 
@@ -292,8 +430,10 @@ class _BookFormScreenState extends State<BookFormScreen> {
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Fout bij opslaan: $e')),
+        showErrorDialog(
+          context,
+          'Fout bij opslaan',
+          'Het boek kon niet worden opgeslagen:\n\n$e',
         );
       }
     }
@@ -357,18 +497,31 @@ class _BookFormScreenState extends State<BookFormScreen> {
                                 },
                               ),
                               const SizedBox(width: 16),
-                              Expanded(
-                                child: ElevatedButton.icon(
-                                  onPressed: _isLoading ? null : _searchGoogleBooks,
-                                  icon: const Icon(Icons.search),
-                                  label: const Text('Zoeken op titel'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Theme.of(context).colorScheme.primary,
-                                    foregroundColor: Colors.white,
-                                  ),
-                                ),
+                              const Text('Zoek op: '),
+                              DropdownButton<String>(
+                                value: _searchType,
+                                items: const [
+                                  DropdownMenuItem(value: 'title', child: Text('Titel')),
+                                  DropdownMenuItem(value: 'author', child: Text('Auteur')),
+                                  DropdownMenuItem(value: 'isbn', child: Text('ISBN')),
+                                  DropdownMenuItem(value: 'all', child: Text('Alles')),
+                                ],
+                                onChanged: (value) {
+                                  setState(() => _searchType = value!);
+                                },
                               ),
                             ],
+                          ),
+                          const SizedBox(height: 12),
+                          ElevatedButton.icon(
+                            onPressed: _isLoading ? null : _searchGoogleBooks,
+                            icon: const Icon(Icons.search),
+                            label: const Text('Zoeken'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Theme.of(context).colorScheme.primary,
+                              foregroundColor: Colors.white,
+                              minimumSize: const Size(double.infinity, 40),
+                            ),
                           ),
                         ],
                       ),
@@ -378,43 +531,11 @@ class _BookFormScreenState extends State<BookFormScreen> {
                     const SizedBox(height: 12),
                     ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      child: CachedNetworkImage(
+                      child: CoverImage(
                         imageUrl: _coverUrl!,
                         height: 180,
                         width: double.infinity,
                         fit: BoxFit.cover,
-                        placeholder: (context, url) => Container(
-                          height: 180,
-                          width: double.infinity,
-                          color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                          child: Center(
-                            child: CircularProgressIndicator(
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                          ),
-                        ),
-                        errorWidget: (context, url, error) => Container(
-                          height: 180,
-                          width: double.infinity,
-                          color: Theme.of(context).colorScheme.errorContainer,
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.broken_image_outlined,
-                                size: 48,
-                                color: Theme.of(context).colorScheme.onErrorContainer,
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Afbeelding kon niet worden geladen',
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.onErrorContainer,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -464,8 +585,35 @@ class _BookFormScreenState extends State<BookFormScreen> {
                   ),
                   const SizedBox(height: 16),
 
+                  TextFormField(
+                    controller: _coverUrlController,
+                    decoration: InputDecoration(
+                      labelText: 'Cover afbeelding URL',
+                      filled: true,
+                      border: OutlineInputBorder(),
+                      hintText: 'https://example.com/cover.jpg',
+                      suffixIcon: _coverUrlController.text.isNotEmpty
+                          ? IconButton(
+                              icon: Icon(Icons.clear),
+                              onPressed: () {
+                                setState(() {
+                                  _coverUrlController.clear();
+                                  _coverUrl = null;
+                                });
+                              },
+                            )
+                          : null,
+                    ),
+                    onChanged: (value) {
+                      setState(() {
+                        _coverUrl = value.isEmpty ? null : value;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
+
                   DropdownButtonFormField<String>(
-                    value: _selectedType,
+                    initialValue: _selectedType,
                     decoration: InputDecoration(
                       labelText: 'Type *',
                       filled: true,
@@ -649,6 +797,7 @@ class _BookFormScreenState extends State<BookFormScreen> {
                           ),
                           Expanded(
                             child: ListView.builder(
+                              padding: const EdgeInsets.all(8),
                               itemCount: _searchResults.length,
                               itemBuilder: (context, index) {
                                 final book = _searchResults[index];
@@ -660,16 +809,111 @@ class _BookFormScreenState extends State<BookFormScreen> {
                                 final isbn = identifiers?.isNotEmpty == true 
                                     ? identifiers!.first['identifier'] 
                                     : 'Geen ISBN';
+                                final publisher = volumeInfo['publisher'] ?? '';
+                                final publishedDate = volumeInfo['publishedDate'] ?? '';
+                                final imageLinks = volumeInfo['imageLinks'] as Map<String, dynamic>?;
+                                final thumbnailUrl = imageLinks?['thumbnail'] ?? imageLinks?['smallThumbnail'];
                                 
-                                return ListTile(
-                                  title: SelectableText(
-                                    title,
-                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                return Card(
+                                  margin: const EdgeInsets.only(bottom: 8),
+                                  elevation: 1,
+                                  child: InkWell(
+                                    onTap: () => _selectBook(book),
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(12),
+                                      child: Row(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          // Cover thumbnail
+                                          if (thumbnailUrl != null)
+                                            ClipRRect(
+                                              borderRadius: BorderRadius.circular(4),
+                                              child: CoverImage(
+                                                imageUrl: thumbnailUrl.toString().replaceFirst('http://', 'https://'),
+                                                width: 50,
+                                                height: 70,
+                                                fit: BoxFit.cover,
+                                              ),
+                                            )
+                                          else
+                                            Container(
+                                              width: 50,
+                                              height: 70,
+                                              decoration: BoxDecoration(
+                                                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                                                borderRadius: BorderRadius.circular(4),
+                                              ),
+                                              child: Icon(
+                                                Icons.book,
+                                                color: Theme.of(context).colorScheme.primary,
+                                              ),
+                                            ),
+                                          const SizedBox(width: 12),
+                                          // Book info
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  title,
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 15,
+                                                    color: Theme.of(context).colorScheme.onSurface,
+                                                  ),
+                                                  maxLines: 2,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                                const SizedBox(height: 4),
+                                                Text(
+                                                  author,
+                                                  style: TextStyle(
+                                                    fontSize: 13,
+                                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                                  ),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                                if (publisher.isNotEmpty || publishedDate.isNotEmpty) ...[
+                                                  const SizedBox(height: 4),
+                                                  Text(
+                                                    [
+                                                      if (publisher.isNotEmpty) publisher,
+                                                      if (publishedDate.isNotEmpty) publishedDate,
+                                                    ].join(' • '),
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                                    ),
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ],
+                                                if (isbn != 'Geen ISBN') ...[
+                                                  const SizedBox(height: 4),
+                                                  Text(
+                                                    'ISBN: $isbn',
+                                                    style: TextStyle(
+                                                      fontSize: 11,
+                                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                                      fontFamily: 'monospace',
+                                                    ),
+                                                  ),
+                                                ],
+                                              ],
+                                            ),
+                                          ),
+                                          // Arrow icon to indicate clickability
+                                          Icon(
+                                            Icons.arrow_forward_ios,
+                                            size: 16,
+                                            color: Theme.of(context).colorScheme.primary,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   ),
-                                  subtitle: SelectableText('$author\nISBN: $isbn'),
-                                  isThreeLine: true,
-                                  onTap: () => _selectBook(book),
-                                  tileColor: index % 2 == 0 ? Theme.of(context).colorScheme.surfaceContainerHighest : Theme.of(context).colorScheme.surface,
                                 );
                               },
                             ),

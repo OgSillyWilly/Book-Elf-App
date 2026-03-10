@@ -13,19 +13,30 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   final _apiService = ApiService();
   final _urlController = TextEditingController();
+  final _apiKeyController = TextEditingController();
   bool _isTestingConnection = false;
   String? _connectionResult;
+  bool _obscureApiKey = true;
   
   @override
   void initState() {
     super.initState();
     _loadCurrentUrl();
+    _loadApiKey();
   }
 
   Future<void> _loadCurrentUrl() async {
     final prefs = await SharedPreferences.getInstance();
     final customUrl = prefs.getString('api_base_url');
     _urlController.text = customUrl ?? ApiService.baseUrl;
+  }
+
+  Future<void> _loadApiKey() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedKey = prefs.getString('google_books_api_key');
+    if (savedKey != null && mounted) {
+      _apiKeyController.text = savedKey;
+    }
   }
 
   Future<void> _testConnection() async {
@@ -72,9 +83,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  Future<void> _saveApiKey() async {
+    final key = _apiKeyController.text.trim();
+    
+    final prefs = await SharedPreferences.getInstance();
+    if (key.isEmpty) {
+      await prefs.remove('google_books_api_key');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('API key verwijderd - gebruikt de standaard (gedeelde quota)'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } else {
+      await prefs.setString('google_books_api_key', key);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Google Books API key opgeslagen!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   void dispose() {
     _urlController.dispose();
+    _apiKeyController.dispose();
     super.dispose();
   }
 
@@ -186,6 +225,182 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       child: Text(_connectionResult!),
                     ),
                   ],
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.book,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Google Books API',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Configureer je eigen API key om quota problemen te vermijden.',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _apiKeyController,
+                    obscureText: _obscureApiKey,
+                    decoration: InputDecoration(
+                      labelText: 'Google Books API Key (optioneel)',
+                      hintText: 'AIza...',
+                      helperText: 'Laat leeg voor standaard (gedeelde quota)',
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscureApiKey ? Icons.visibility : Icons.visibility_off,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _obscureApiKey = !_obscureApiKey;
+                          });
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton.icon(
+                    onPressed: _saveApiKey,
+                    icon: const Icon(Icons.save),
+                    label: const Text('Opslaan'),
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.info_outline, size: 16),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Hoe krijg ik een API key?',
+                              style: Theme.of(context).textTheme.titleSmall,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '1. Ga naar console.cloud.google.com\n'
+                          '2. Maak een nieuw project aan\n'
+                          '3. Activeer "Books API"\n'
+                          '4. Maak credentials → API key\n'
+                          '5. Kopieer en plak hier\n\n'
+                          'Voordeel: 10.000 requests/dag ipv gedeelde quota',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.book,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Google Books API',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Configureer je eigen API key om quota problemen te vermijden.',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _apiKeyController,
+                    obscureText: _obscureApiKey,
+                    decoration: InputDecoration(
+                      labelText: 'Google Books API Key (optioneel)',
+                      hintText: 'AIza...',
+                      helperText: 'Laat leeg voor standaard (gedeelde quota)',
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscureApiKey ? Icons.visibility : Icons.visibility_off,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _obscureApiKey = !_obscureApiKey;
+                          });
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton.icon(
+                    onPressed: _saveApiKey,
+                    icon: const Icon(Icons.save),
+                    label: const Text('Opslaan'),
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.info_outline, size: 16),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Hoe krijg ik een API key?',
+                              style: Theme.of(context).textTheme.titleSmall,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '1. Ga naar console.cloud.google.com\n'
+                          '2. Maak een nieuw project aan\n'
+                          '3. Activeer "Books API"\n'
+                          '4. Maak credentials → API key\n'
+                          '5. Kopieer en plak hier\n\n'
+                          'Voordeel: 10.000 requests/dag ipv gedeelde quota',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../models/book.dart';
+import '../utils/error_dialog.dart';
+import '../widgets/cover_image.dart';
 
 class ReadingHistoryScreen extends StatefulWidget {
   const ReadingHistoryScreen({super.key});
@@ -52,8 +54,10 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Fout bij laden boeken: $e')),
+        showErrorDialog(
+          context,
+          'Fout bij laden boeken',
+          'De boeken voor dit jaar konden niet worden geladen:\n\n$e',
         );
       }
     }
@@ -181,13 +185,11 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
             leading: book.coverUrl != null
                 ? ClipRRect(
                     borderRadius: BorderRadius.circular(4),
-                    child: Image.network(
-                      book.coverUrl!,
+                    child: CoverImage(
+                      imageUrl: book.coverUrl!,
                       width: 40,
                       height: 60,
                       fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                          const Icon(Icons.book, size: 40),
                     ),
                   )
                 : const Icon(Icons.book, size: 40),

@@ -41,6 +41,7 @@ class ApiService {
       final url = await getBaseUrl();
       final response = await http.get(
         Uri.parse('$url/books'),
+        headers: {'Accept': 'application/json'},
       ).timeout(const Duration(seconds: 5));
       
       return response.statusCode == 200;
@@ -54,6 +55,7 @@ class ApiService {
       final url = await getBaseUrl();
       final response = await http.get(
         Uri.parse('$url/books'),
+        headers: {'Accept': 'application/json'},
       ).timeout(timeout);
       
       if (response.statusCode == 200) {
@@ -75,7 +77,10 @@ class ApiService {
       final url = await getBaseUrl();
       final response = await http.post(
         Uri.parse('$url/books'),
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
         body: json.encode(bookData),
       ).timeout(timeout);
 
@@ -90,11 +95,14 @@ class ApiService {
   }
 
   Future<Book> updateBook(int id, Map<String, dynamic> bookData) async {
+    final url = await getBaseUrl();
     try {
-      final url = await getBaseUrl();
       final response = await http.put(
         Uri.parse('$url/books/$id'),
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
         body: json.encode(bookData),
       ).timeout(timeout);
 
@@ -105,6 +113,9 @@ class ApiService {
       }
     } on TimeoutException {
       throw Exception('Verbinding timeout - controleer of de server draait');
+    } catch (e) {
+      // Meer gedetailleerde error info voor debugging
+      throw Exception('Update mislukt: ${e.toString()}\n\nURL: $url/books/$id\n\nOm dit op te lossen:\n- Open Chrome DevTools (F12)\n- Ga naar Network tab\n- Probeer opnieuw\n- Check of er een CORS error is (rood)\n\nOf gebruik een mobiele versie/emulator waar dit probleem niet optreedt.');
     }
   }
 
@@ -113,6 +124,7 @@ class ApiService {
       final url = await getBaseUrl();
       final response = await http.delete(
         Uri.parse('$url/books/$id'),
+        headers: {'Accept': 'application/json'},
       ).timeout(timeout);
       
       if (response.statusCode != 204 && response.statusCode != 200) {
@@ -130,6 +142,8 @@ class ApiService {
         'POST',
         Uri.parse('$url/books/import'),
       );
+      
+      request.headers['Accept'] = 'application/json';
 
       request.files.add(
         http.MultipartFile.fromBytes(
@@ -164,6 +178,7 @@ class ApiService {
       final url = await getBaseUrl();
       final response = await http.get(
         Uri.parse('$url/books?year_read=$year'),
+        headers: {'Accept': 'application/json'},
       ).timeout(timeout);
       
       if (response.statusCode == 200) {
@@ -185,6 +200,7 @@ class ApiService {
       final url = await getBaseUrl();
       final response = await http.get(
         Uri.parse('$url/books/reading-history'),
+        headers: {'Accept': 'application/json'},
       ).timeout(timeout);
       
       if (response.statusCode == 200) {

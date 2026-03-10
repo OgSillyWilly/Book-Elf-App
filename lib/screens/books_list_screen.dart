@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../models/book.dart';
 import '../services/api_service.dart';
+import '../utils/error_dialog.dart';
+import '../widgets/cover_image.dart';
 import 'book_form_screen.dart';
 import 'settings_screen.dart';
 import 'reading_history_screen.dart';
@@ -32,7 +33,8 @@ class _BooksListScreenState extends State<BooksListScreen> {
   String _readFilter = 'all'; // 'all', 'read', 'unread'
   String? _typeFilter; // null = all types
   int? _yearFilter; // null = all years
-  String _sortBy = 'none'; // 'none', 'title', 'author'
+  String? _cabinetFilter; // null = all cabinets
+  String _sortBy = 'none'; // 'none', 'title', 'author', 'cabinet'
   bool _isSelectionMode = false;
   final Set<int> _selectedBookIds = {};
 
@@ -95,7 +97,10 @@ class _BooksListScreenState extends State<BooksListScreen> {
           }
         }
         
-        return matchesSearch && matchesReadFilter && matchesTypeFilter && matchesYearFilter;
+        final matchesCabinetFilter = _cabinetFilter == null ||
+            (book.cabinet != null && book.cabinet == _cabinetFilter);
+        
+        return matchesSearch && matchesReadFilter && matchesTypeFilter && matchesYearFilter && matchesCabinetFilter;
       }).toList();
       
       // Apply sorting
@@ -103,6 +108,17 @@ class _BooksListScreenState extends State<BooksListScreen> {
         _filteredBooks.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
       } else if (_sortBy == 'author') {
         _filteredBooks.sort((a, b) => a.author.toLowerCase().compareTo(b.author.toLowerCase()));
+      } else if (_sortBy == 'cabinet') {
+        _filteredBooks.sort((a, b) {
+          // Sort by cabinet first, then by shelf, then by position
+          final cabinetCompare = (a.cabinet ?? '').compareTo(b.cabinet ?? '');
+          if (cabinetCompare != 0) return cabinetCompare;
+          
+          final shelfCompare = (a.shelf ?? '').compareTo(b.shelf ?? '');
+          if (shelfCompare != 0) return shelfCompare;
+          
+          return (a.position ?? 0).compareTo(b.position ?? 0);
+        });
       }
     });
   }
@@ -130,6 +146,16 @@ class _BooksListScreenState extends State<BooksListScreen> {
         .toList();
     years.sort((a, b) => b.compareTo(a)); // Descending order (newest first)
     return years;
+  }
+
+  List<String> _getUniqueCabinets() {
+    final cabinets = _allBooks
+        .where((book) => book.cabinet != null && book.cabinet!.isNotEmpty)
+        .map((book) => book.cabinet!)
+        .toSet()
+        .toList();
+    cabinets.sort();
+    return cabinets;
   }
 
   Future<void> _deleteBook(int id) async {
@@ -163,8 +189,10 @@ class _BooksListScreenState extends State<BooksListScreen> {
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Fout bij verwijderen: $e')),
+          showErrorDialog(
+            context,
+            'Fout bij verwijderen',
+            'Het boek kon niet worden verwijderd:\n\n$e',
           );
         }
       }
@@ -466,7 +494,7 @@ class _BooksListScreenState extends State<BooksListScreen> {
                         // Year filter dropdown
                         Expanded(
                           child: DropdownButtonFormField<int?>(
-                            value: _yearFilter,
+                            initialValue: _yearFilter,
                             decoration: const InputDecoration(
                               labelText: 'Jaar gelezen',
                               prefixIcon: Icon(Icons.calendar_today, size: 20),
@@ -506,6 +534,35 @@ class _BooksListScreenState extends State<BooksListScreen> {
                           ),
                         ),
                         const SizedBox(width: 8),
+                        // Cabinet filter dropdown
+                        Expanded(
+                          child: DropdownButtonFormField<String?>(
+                            initialValue: _cabinetFilter,
+                            decoration: const InputDecoration(
+                              labelText: 'Kast',
+                              prefixIcon: Icon(Icons.shelves, size: 20),
+                              contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                              isDense: true,
+                            ),
+                            isExpanded: true,
+                            items: [
+                              const DropdownMenuItem(value: null, child: Text('Alle', overflow: TextOverflow.ellipsis)),
+                              ..._getUniqueCabinets().map((cabinet) =>
+                                DropdownMenuItem(value: cabinet, child: Text(cabinet, overflow: TextOverflow.ellipsis)),
+                              ),
+                            ],
+                            onChanged: (value) {
+                              setState(() => _cabinetFilter = value);
+                              _filterBooks();
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    // Compact sort dropdown - Row 3
+                    Row(
+                      children: [
                         // Sort dropdown
                         Expanded(
                           child: DropdownButtonFormField<String>(
@@ -521,6 +578,7 @@ class _BooksListScreenState extends State<BooksListScreen> {
                               DropdownMenuItem(value: 'none', child: Text('Standaard', overflow: TextOverflow.ellipsis)),
                               DropdownMenuItem(value: 'title', child: Text('Titel', overflow: TextOverflow.ellipsis)),
                               DropdownMenuItem(value: 'author', child: Text('Auteur', overflow: TextOverflow.ellipsis)),
+                              DropdownMenuItem(value: 'cabinet', child: Text('Kast', overflow: TextOverflow.ellipsis)),
                             ],
                             onChanged: (value) {
                               if (value != null) {
@@ -606,31 +664,11 @@ class _BooksListScreenState extends State<BooksListScreen> {
                                         : book.coverUrl != null && book.coverUrl!.isNotEmpty
                                         ? ClipRRect(
                                             borderRadius: BorderRadius.circular(10),
-                                            child: CachedNetworkImage(
+                                            child: CoverImage(
                                               imageUrl: book.coverUrl!,
                                               width: 48,
                                               height: 64,
                                               fit: BoxFit.cover,
-                                              placeholder: (context, url) => SizedBox(
-                                                width: 48,
-                                                height: 64,
-                                                child: Center(
-                                                  child: CircularProgressIndicator(
-                                                    strokeWidth: 2,
-                                                    color: Theme.of(context).colorScheme.primary,
-                                                  ),
-                                                ),
-                                              ),
-                                              errorWidget: (context, url, error) => CircleAvatar(
-                                                backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-                                                child: Icon(
-                                                  Icons.broken_image,
-                                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                                  size: 20,
-                                                ),
-                                              ),
-                                              fadeInDuration: const Duration(milliseconds: 300),
-                                              fadeOutDuration: const Duration(milliseconds: 100),
                                             ),
                                           )
                                         : CircleAvatar(
@@ -779,11 +817,10 @@ class _BooksListScreenState extends State<BooksListScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Fout bij importeren: $e'),
-            backgroundColor: Colors.red,
-          ),
+        showErrorDialog(
+          context,
+          'Fout bij importeren',
+          'Er is een fout opgetreden bij het importeren van boeken:\n\n$e\n\nControleer of het bestand in het juiste formaat is.',
         );
       }
     } finally {

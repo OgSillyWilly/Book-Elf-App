@@ -1,0 +1,95 @@
+title,author,isbn,type,publisher,publication_date,cabinet,shelf,position,is_read,genre
+De Naam van de Wind,Patrick Rothfuss,9789024576890,boek,Luitingh-Sijthoff,2008-03-27,1,A,1,1,fantasy
+Een Donker Verlangen,J.R. Ward,9789022564899,boek,Boekerij,2006-09-14,1,A,2,1,paranormaal
+Het Oog van de Wereld,Robert Jordan,9789024562015,boek,Luitingh-Sijthoff,1990-01-15,1,A,3,0,fantasy
+Harry Potter en de Steen der Wijzen,J.K. Rowling,9789076174037,boek,De Harmonie,1997-11-01,1,A,4,1,jeugd
+De Hobbit,J.R.R. Tolkien,9789022545270,boek,Spectrum,1937-09-21,1,A,5,1,fantasy
+1984,George Orwell,9789000348503,boek,Signet,1949-06-08,1,B,1,1,dystopie
+Brave New World,Aldous Huxley,9780060850524,boek,Harper Perennial,1932-04-01,1,B,2,1,dystopie
+The Handmaid's Tale,Margaret Atwood,9780385490818,boek,Anchor,1985-09-08,1,B,3,0,dystopie
+De Cirkel,Dave Eggers,9789025441661,boek,Lebowski,2013-10-08,1,B,4,1,sciencefiction
+De Hongerspelen,Suzanne Collins,9789000307999,boek,Scholastic,2008-09-14,1,B,5,1,jeugd
+Het Meisje met de Rode Paraplu,Christina Baker Kline,9789022572399,boek,Boekerij,2013-04-23,1,C,1,0,historisch
+De Vliegeraar,Khaled Hosseini,9789023456810,boek,De Bezige Bij,2003-05-29,1,C,2,1,historisch
+Het Boek van Alle Dingen,Guus Kuijer,9789045111759,boek,Querido,2004-03-01,1,C,3,1,jeugd
+Oorlog en Vrede,Leo Tolstoj,9789000308590,boek,Vintage,1869-01-01,1,C,4,0,klassiek
+Anna Karenina,Leo Tolstoj,9780143035008,boek,Penguin Classics,1877-01-01,1,C,5,0,klassiek
+De Gebroeders Karamazov,Fjodor Dostojevski,9789000308514,boek,Farrar,1880-11-01,2,A,1,0,klassiek
+Misdaad en Straf,Fjodor Dostojevski,9780143058144,boek,Penguin Classics,1866-01-01,2,A,2,1,klassiek
+Moby Dick,Herman Melville,9780142437247,boek,Penguin Classics,1851-10-18,2,A,3,0,klassiek
+De Grote Gatsby,F. Scott Fitzgerald,9780743273565,boek,Scribner,1925-04-10,2,A,4,1,klassiek
+De Vanger in het Graan,J.D. Salinger,9789046704431,boek,De Bezige Bij,1951-07-16,2,A,5,1,klassiek
+Het Parfum,Patrick Süskind,9789025420062,boek,Diogenes,1985-03-01,2,B,1,1,thriller
+De Aanslag,Harry Mulisch,9789023456728,boek,De Bezige Bij,1982-01-01,2,B,2,1,historisch
+De Ontdekking van de Hemel,Harry Mulisch,9789023456735,boek,De Bezige Bij,1992-11-01,2,B,3,1,literair
+Het Bureau,J.J. Voskuil,9789029565646,bundel,Lebowski,1996-09-01,2,B,4,0,literair
+De Avonden,Gerard Reve,9789023456742,boek,De Bezige Bij,1947-11-10,2,B,5,1,literair
+Nooit Meer Slapen,W.F. Hermans,9789023456759,boek,De Bezige Bij,1966-09-16,2,C,1,1,literair
+Turks Fruit,Jan Wolkers,9789029538268,boek,Meulenhoff,1969-01-01,2,C,2,1,literair
+De Donkere Kamer van Damokles,W.F. Hermans,9789023456766,boek,De Bezige Bij,1958-01-01,2,C,3,0,literair
+Max Havelaar,Multatuli,9789000311088,boek,Nijgh & Van Ditmar,1860-05-01,2,C,4,0,klassiek
+Het Verdriet van België,Hugo Claus,9789023456773,boek,De Bezige Bij,1983-09-01,2,C,5,0,literair
+Millennium 1: Mannen die vrouwen haten,Stieg Larsson,9789056724580,boek,Signatuur,2005-08-01,3,A,1,1,thriller
+Millennium 2: Verdoemenis,Stieg Larsson,9789056724597,boek,Signatuur,2006-05-01,3,A,2,1,thriller
+Millennium 3: Gerechtigheid,Stieg Larsson,9789056724603,boek,Signatuur,2007-05-01,3,A,3,1,thriller
+De Da Vinci Code,Dan Brown,9789024555093,boek,Luitingh-Sijthoff,2003-03-18,3,A,4,1,thriller
+Het Bernini Mysterie,Dan Brown,9789024555109,boek,Luitingh-Sijthoff,2000-09-15,3,A,5,1,thriller
+Inferno,Dan Brown,9789024563715,boek,Luitingh-Sijthoff,2013-05-14,3,B,1,0,thriller
+De Verloren Symbool,Dan Brown,9789024561940,boek,Luitingh-Sijthoff,2009-09-15,3,B,2,1,thriller
+Origin,Dan Brown,9789024574681,boek,Luitingh-Sijthoff,2017-10-03,3,B,3,0,thriller
+Gone Girl,Gillian Flynn,9789044973358,boek,A.W. Bruna,2012-06-05,3,B,4,1,thriller
+The Girl on the Train,Paula Hawkins,9789044973822,boek,A.W. Bruna,2015-01-13,3,B,5,1,thriller
+Big Little Lies,Liane Moriarty,9789044973877,boek,A.W. Bruna,2014-07-29,3,C,1,0,thriller
+De Vrouw in het Raam,A.J. Finn,9789026343407,boek,Ambo Anthos,2018-01-02,3,C,2,1,thriller
+De Zwijger,Jussi Adler-Olsen,9789044973976,boek,A.W. Bruna,2007-08-01,3,C,3,1,thriller
+Sneeuwwitje Moet Sterven,Nele Neuhaus,9789044973891,boek,A.W. Bruna,2010-09-01,3,C,4,0,thriller
+De Tweeling,Tessa de Loo,9789026349621,boek,Ambo Anthos,1993-09-01,3,C,5,1,historisch
+Het Gouden Ei,Tim Krabbé,9789021455112,boek,Elsevier,1984-09-01,4,A,1,1,thriller
+Koning van Katoren,Jan Terlouw,9789060698402,boek,Lemniscaat,1971-01-01,4,A,2,1,jeugd
+Kruistocht in Spijkerbroek,Thea Beckman,9789056372026,boek,Lemniscaat,1973-01-01,4,A,3,1,jeugd
+De Kinderen van Moeder Aarde,Thea Beckman,9789056372033,bundel,Lemniscaat,1981-01-01,4,A,4,0,jeugd
+De Brief voor de Koning,Tonke Dragt,9789025855475,boek,Leopold,1962-01-01,4,A,5,1,jeugd
+De Rode Ridder Albums,Willy Vandersteen,9789002249518,strip,Standaard Uitgeverij,1959-10-11,4,B,1,0,strip
+Suske en Wiske - De Zwarte Madam,Willy Vandersteen,9789002249525,strip,Standaard Uitgeverij,1964-01-01,4,B,2,1,strip
+Asterix en Obelix - De Galliër,René Goscinny,9782012101302,strip,Dargaud,1961-01-01,4,B,3,1,strip
+Kuifje - De Krab met de Gouden Scharen,Hergé,9782203001237,strip,Casterman,1941-01-01,4,B,4,1,strip
+Lucky Luke - De Daltons,Morris,9782884710268,strip,Dupuis,1958-01-01,4,B,5,0,strip
+De Gruffalo,Julia Donaldson,9789047704775,boek,Lemniscaat,1999-03-23,4,C,1,1,jeugd
+Het Kleine Huis,Margaret Wise Brown,9789047705994,boek,Christofoor,1947-01-01,4,C,2,0,jeugd
+De Kleine Prins,Antoine de Saint-Exupéry,9789000035717,boek,Harcourt,1943-04-06,4,C,3,1,jeugd
+Matilda,Roald Dahl,9789026133701,boek,De Fontein,1988-10-01,4,C,4,1,jeugd
+Charlie en de Chocoladefabriek,Roald Dahl,9789026133718,boek,De Fontein,1964-01-17,4,C,5,1,jeugd
+De Heksen,Roald Dahl,9789026133725,boek,De Fontein,1983-10-27,5,A,1,0,jeugd
+James en de Reuzenpers,Roald Dahl,9789026133732,boek,De Fontein,1961-11-17,5,A,2,1,jeugd
+Een Beest van een Vriend,Roald Dahl,9789026133749,boek,De Fontein,1982-01-14,5,A,3,0,jeugd
+Dune,Frank Herbert,9789024571949,boek,Luitingh-Sijthoff,1965-08-01,5,A,4,1,sciencefiction
+Foundation,Isaac Asimov,9780553293357,boek,Bantam,1951-06-01,5,A,5,0,sciencefiction
+Neuromancer,William Gibson,9780441569595,boek,Ace,1984-07-01,5,B,1,1,sciencefiction
+Ender's Game,Orson Scott Card,9780812550702,boek,Tor Books,1985-01-15,5,B,2,1,sciencefiction
+The Left Hand of Darkness,Ursula K. Le Guin,9780441478125,boek,Ace,1969-03-01,5,B,3,0,sciencefiction
+Do Androids Dream of Electric Sheep?,Philip K. Dick,9780345404473,boek,Del Rey,1968-01-01,5,B,4,1,sciencefiction
+Snow Crash,Neal Stephenson,9780553380958,boek,Bantam,1992-06-01,5,B,5,0,sciencefiction
+The Martian,Andy Weir,9780553418026,boek,Crown,2011-01-01,5,C,1,1,sciencefiction
+Ready Player One,Ernest Cline,9780307887436,boek,Crown,2011-08-16,5,C,2,1,sciencefiction
+The Hitchhiker's Guide to the Galaxy,Douglas Adams,9780345391803,boek,Del Rey,1979-10-12,5,C,3,1,sciencefiction
+Het Achterhuis,Anne Frank,9789035132146,boek,Bert Bakker,1947-06-25,5,C,4,1,historisch
+De Opkomst en Ondergang van het Derde Rijk,William L. Shirer,9789000332977,boek,Simon & Schuster,1960-10-17,5,C,5,0,historisch
+Sapiens,Yuval Noah Harari,9789400407930,boek,Thomas Rap,2011-01-01,6,A,1,1,wetenschap
+Homo Deus,Yuval Noah Harari,9789400407947,boek,Thomas Rap,2015-09-01,6,A,2,0,wetenschap
+21 Lessen voor de 21ste Eeuw,Yuval Noah Harari,9789400407954,boek,Thomas Rap,2018-08-30,6,A,3,1,wetenschap
+Een Kleine Geschiedenis van Bijna Alles,Bill Bryson,9789045015163,boek,Atlas Contact,2003-05-06,6,A,4,1,wetenschap
+De Meeste Mensen Deugen,Rutger Bregman,9789082520231,boek,De Correspondent,2019-05-02,6,A,5,1,filosofie
+Thinking Fast and Slow,Daniel Kahneman,9780374533557,boek,Farrar,2011-10-25,6,B,1,0,wetenschap
+The Power of Habit,Charles Duhigg,9780812981605,boek,Random House,2012-02-28,6,B,2,1,zelfhulp
+Atomic Habits,James Clear,9780735211292,boek,Avery,2018-10-16,6,B,3,1,zelfhulp
+De Kracht van het Nu,Eckhart Tolle,9789020284126,boek,Ankh-Hermes,1997-01-01,6,B,4,0,spiritueel
+De Vier Afspraken,Don Miguel Ruiz,9789460410253,boek,Hay House,1997-11-07,6,B,5,1,spiritueel
+The Secret,Rhonda Byrne,9789021550602,boek,VBK Media,2006-11-28,6,C,1,0,zelfhulp
+Eet Vet Word Slank,Dr. Jason Fung,9789021567389,boek,Kosmos,2016-10-25,6,C,2,1,gezondheid
+De 7 Eigenschappen,Stephen Covey,9789047008378,boek,Business Contact,1989-08-15,6,C,3,0,management
+Influence,Robert Cialdini,9780061241895,boek,Harper Business,1984-01-01,6,C,4,1,psychologie
+Drive,Daniel H. Pink,9781594484803,boek,Riverhead,2009-12-29,6,C,5,0,management
+Outliers,Malcolm Gladwell,9780316017923,boek,Little Brown,2008-11-18,7,A,1,1,wetenschap
+The Tipping Point,Malcolm Gladwell,9780316346627,boek,Little Brown,2000-03-01,7,A,2,0,sociologie
+Blink,Malcolm Gladwell,9780316010665,boek,Little Brown,2005-01-11,7,A,3,1,psychologie
+Freakonomics,Steven D. Levitt,9780060731328,boek,Morrow,2005-04-12,7,A,4,1,economie
