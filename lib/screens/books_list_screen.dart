@@ -3,6 +3,8 @@ import 'package:file_picker/file_picker.dart';
 import '../models/book.dart';
 import '../services/api_service.dart';
 import '../utils/error_dialog.dart';
+import '../utils/book_filter.dart';
+import '../utils/book_sorter.dart';
 import '../widgets/cover_image.dart';
 import 'book_form_screen.dart';
 import 'settings_screen.dart';
@@ -72,91 +74,27 @@ class _BooksListScreenState extends State<BooksListScreen> {
   }
 
   void _filterBooks() {
-    final query = _searchController.text.toLowerCase();
     setState(() {
-      _filteredBooks = _allBooks.where((book) {
-        final matchesSearch = query.isEmpty ||
-            book.title.toLowerCase().contains(query) ||
-            book.author.toLowerCase().contains(query);
-        
-        final matchesReadFilter = _readFilter == 'all' ||
-            (_readFilter == 'read' && book.isRead) ||
-            (_readFilter == 'unread' && !book.isRead);
-        
-        final matchesTypeFilter = _typeFilter == null ||
-            book.type == _typeFilter;
-        
-        // Extract year from endDate for filtering
-        bool matchesYearFilter = _yearFilter == null;
-        if (_yearFilter != null && book.endDate != null && book.endDate!.isNotEmpty) {
-          try {
-            final date = DateTime.parse(book.endDate!);
-            matchesYearFilter = date.year == _yearFilter;
-          } catch (e) {
-            matchesYearFilter = false;
-          }
-        }
-        
-        final matchesCabinetFilter = _cabinetFilter == null ||
-            (book.cabinet != null && book.cabinet == _cabinetFilter);
-        
-        return matchesSearch && matchesReadFilter && matchesTypeFilter && matchesYearFilter && matchesCabinetFilter;
-      }).toList();
+      // Apply filters using BookFilter utility
+      _filteredBooks = BookFilter.applyFilters(
+        _allBooks,
+        searchQuery: _searchController.text,
+        readFilter: _readFilter,
+        typeFilter: _typeFilter,
+        yearFilter: _yearFilter,
+        cabinetFilter: _cabinetFilter,
+      );
       
-      // Apply sorting
-      if (_sortBy == 'title') {
-        _filteredBooks.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
-      } else if (_sortBy == 'author') {
-        _filteredBooks.sort((a, b) => a.author.toLowerCase().compareTo(b.author.toLowerCase()));
-      } else if (_sortBy == 'cabinet') {
-        _filteredBooks.sort((a, b) {
-          // Sort by cabinet first, then by shelf, then by position
-          final cabinetCompare = (a.cabinet ?? '').compareTo(b.cabinet ?? '');
-          if (cabinetCompare != 0) return cabinetCompare;
-          
-          final shelfCompare = (a.shelf ?? '').compareTo(b.shelf ?? '');
-          if (shelfCompare != 0) return shelfCompare;
-          
-          return (a.position ?? 0).compareTo(b.position ?? 0);
-        });
-      }
+      // Apply sorting using BookSorter utility
+      BookSorter.applySorting(_filteredBooks, _sortBy);
     });
   }
   
-  List<String> _getUniqueTypes() {
-    final types = _allBooks.map((book) => book.type).toSet().toList();
-    types.sort();
-    return types;
-  }
+  List<String> _getUniqueTypes() => BookFilter.getUniqueTypes(_allBooks);
 
-  List<int> _getUniqueYears() {
-    final years = _allBooks
-        .where((book) => book.endDate != null && book.endDate!.isNotEmpty)
-        .map((book) {
-          try {
-            final date = DateTime.parse(book.endDate!);
-            return date.year;
-          } catch (e) {
-            return null;
-          }
-        })
-        .where((year) => year != null)
-        .cast<int>()
-        .toSet()
-        .toList();
-    years.sort((a, b) => b.compareTo(a)); // Descending order (newest first)
-    return years;
-  }
+  List<int> _getUniqueYears() => BookFilter.getUniqueYears(_allBooks);
 
-  List<String> _getUniqueCabinets() {
-    final cabinets = _allBooks
-        .where((book) => book.cabinet != null && book.cabinet!.isNotEmpty)
-        .map((book) => book.cabinet!)
-        .toSet()
-        .toList();
-    cabinets.sort();
-    return cabinets;
-  }
+  List<String> _getUniqueCabinets() => BookFilter.getUniqueCabinets(_allBooks);
 
   Future<void> _deleteBook(int id) async {
     final confirm = await showDialog<bool>(
@@ -335,32 +273,15 @@ class _BooksListScreenState extends State<BooksListScreen> {
             : [
                 IconButton(
                   icon: const Icon(Icons.checklist),
-                  tooltip: 'Selecteer meerdere',
+                  tooltip: 'Selecteer meerdere boeken',
                   onPressed: _enterSelectionMode,
                 ),
-                _isImporting
-                    ? Padding(
-                        padding: const EdgeInsets.all(12.0),
-                        child: SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              Theme.of(context).colorScheme.primary,
-                            ),
-                          ),
-                        ),
-                      )
-                    : IconButton(
-                        icon: const Icon(Icons.upload_file),
-                        tooltip: 'Importeer Excel/CSV',
-                        onPressed: _importExcel,
-                      ),
                 PopupMenuButton<String>(
                   icon: const Icon(Icons.more_vert),
                   onSelected: (value) {
-                    if (value == 'template') {
+                    if (value == 'import') {
+                      _importExcel();
+                    } else if (value == 'template') {
                       _downloadTemplate();
                     } else if (value == 'settings') {
                       Navigator.push(
@@ -392,6 +313,23 @@ class _BooksListScreenState extends State<BooksListScreen> {
                           Icon(Icons.settings),
                           SizedBox(width: 8),
                           Text('Instellingen'),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'import',
+                      enabled: !_isImporting,
+                      child: Row(
+                        children: [
+                          _isImporting
+                              ? const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.upload_file),
+                          const SizedBox(width: 8),
+                          Text(_isImporting ? 'Importeren...' : 'Importeer Excel/CSV'),
                         ],
                       ),
                     ),

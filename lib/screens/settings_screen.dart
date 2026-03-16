@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
-import '../services/api_service.dart';
+import '../utils/settings_helper.dart';
+import '../widgets/server_connection_card.dart';
+import '../widgets/google_books_api_key_card.dart';
+import '../widgets/help_card.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -11,53 +12,24 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  final _apiService = ApiService();
   final _urlController = TextEditingController();
   final _apiKeyController = TextEditingController();
-  bool _isTestingConnection = false;
-  String? _connectionResult;
-  bool _obscureApiKey = true;
   
   @override
   void initState() {
     super.initState();
-    _loadCurrentUrl();
-    _loadApiKey();
+    _loadSettings();
   }
 
-  Future<void> _loadCurrentUrl() async {
-    final prefs = await SharedPreferences.getInstance();
-    final customUrl = prefs.getString('api_base_url');
-    _urlController.text = customUrl ?? ApiService.baseUrl;
-  }
-
-  Future<void> _loadApiKey() async {
-    final prefs = await SharedPreferences.getInstance();
-    final savedKey = prefs.getString('google_books_api_key');
-    if (savedKey != null && mounted) {
-      _apiKeyController.text = savedKey;
-    }
-  }
-
-  Future<void> _testConnection() async {
-    setState(() {
-      _isTestingConnection = true;
-      _connectionResult = null;
-    });
-
-    try {
-      final success = await _apiService.testConnection();
-      setState(() {
-        _connectionResult = success 
-            ? '✅ Verbinding succesvol!'
-            : '❌ Kan API niet bereiken';
-        _isTestingConnection = false;
-      });
-    } catch (e) {
-      setState(() {
-        _connectionResult = '❌ Fout: $e';
-        _isTestingConnection = false;
-      });
+  Future<void> _loadSettings() async {
+    final url = await SettingsHelper.loadApiUrl();
+    final apiKey = await SettingsHelper.loadGoogleBooksApiKey();
+    
+    if (mounted) {
+      _urlController.text = url;
+      if (apiKey != null) {
+        _apiKeyController.text = apiKey;
+      }
     }
   }
 
@@ -70,8 +42,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       return;
     }
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('api_base_url', url);
+    await SettingsHelper.saveApiUrl(url);
     
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -85,28 +56,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _saveApiKey() async {
     final key = _apiKeyController.text.trim();
+    await SettingsHelper.saveGoogleBooksApiKey(key);
     
-    final prefs = await SharedPreferences.getInstance();
-    if (key.isEmpty) {
-      await prefs.remove('google_books_api_key');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('API key verwijderd - gebruikt de standaard (gedeelde quota)'),
-            backgroundColor: Colors.orange,
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            key.isEmpty
+                ? 'API key verwijderd - gebruikt de standaard (gedeelde quota)'
+                : 'Google Books API key opgeslagen!',
           ),
-        );
-      }
-    } else {
-      await prefs.setString('google_books_api_key', key);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Google Books API key opgeslagen!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
+          backgroundColor: key.isEmpty ? Colors.orange : Colors.green,
+        ),
+      );
     }
   }
 
@@ -126,365 +88,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.cloud,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Server Verbinding',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Huidige configuratie:',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Platform: ${kIsWeb ? 'Web (Chrome)' : 'Mobiel (iPhone)'}',
-                          style: const TextStyle(fontFamily: 'monospace'),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'API URL: ${ApiService.baseUrl}',
-                          style: const TextStyle(fontFamily: 'monospace'),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _urlController,
-                    decoration: const InputDecoration(
-                      labelText: 'API Base URL',
-                      hintText: 'http://127.0.0.1:8000/api',
-                      helperText: 'Zonder trailing slash',
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _isTestingConnection ? null : _testConnection,
-                          icon: _isTestingConnection
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                )
-                              : const Icon(Icons.wifi_find),
-                          label: Text(_isTestingConnection ? 'Testen...' : 'Test Verbinding'),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: FilledButton.icon(
-                          onPressed: _saveUrl,
-                          icon: const Icon(Icons.save),
-                          label: const Text('Opslaan'),
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (_connectionResult != null) ...[
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: _connectionResult!.startsWith('✅')
-                            ? Colors.green.withOpacity(0.1)
-                            : Colors.red.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: _connectionResult!.startsWith('✅')
-                              ? Colors.green
-                              : Colors.red,
-                        ),
-                      ),
-                      child: Text(_connectionResult!),
-                    ),
-                  ],
-                ],
-              ),
-            ),
+          ServerConnectionCard(
+            urlController: _urlController,
+            onSave: _saveUrl,
           ),
           const SizedBox(height: 16),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.book,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Google Books API',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Configureer je eigen API key om quota problemen te vermijden.',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _apiKeyController,
-                    obscureText: _obscureApiKey,
-                    decoration: InputDecoration(
-                      labelText: 'Google Books API Key (optioneel)',
-                      hintText: 'AIza...',
-                      helperText: 'Laat leeg voor standaard (gedeelde quota)',
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscureApiKey ? Icons.visibility : Icons.visibility_off,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            _obscureApiKey = !_obscureApiKey;
-                          });
-                        },
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  FilledButton.icon(
-                    onPressed: _saveApiKey,
-                    icon: const Icon(Icons.save),
-                    label: const Text('Opslaan'),
-                  ),
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.info_outline, size: 16),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Hoe krijg ik een API key?',
-                              style: Theme.of(context).textTheme.titleSmall,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '1. Ga naar console.cloud.google.com\n'
-                          '2. Maak een nieuw project aan\n'
-                          '3. Activeer "Books API"\n'
-                          '4. Maak credentials → API key\n'
-                          '5. Kopieer en plak hier\n\n'
-                          'Voordeel: 10.000 requests/dag ipv gedeelde quota',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
+          GoogleBooksApiKeyCard(
+            apiKeyController: _apiKeyController,
+            onSave: _saveApiKey,
           ),
           const SizedBox(height: 16),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.book,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Google Books API',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Configureer je eigen API key om quota problemen te vermijden.',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _apiKeyController,
-                    obscureText: _obscureApiKey,
-                    decoration: InputDecoration(
-                      labelText: 'Google Books API Key (optioneel)',
-                      hintText: 'AIza...',
-                      helperText: 'Laat leeg voor standaard (gedeelde quota)',
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscureApiKey ? Icons.visibility : Icons.visibility_off,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            _obscureApiKey = !_obscureApiKey;
-                          });
-                        },
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  FilledButton.icon(
-                    onPressed: _saveApiKey,
-                    icon: const Icon(Icons.save),
-                    label: const Text('Opslaan'),
-                  ),
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.info_outline, size: 16),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Hoe krijg ik een API key?',
-                              style: Theme.of(context).textTheme.titleSmall,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '1. Ga naar console.cloud.google.com\n'
-                          '2. Maak een nieuw project aan\n'
-                          '3. Activeer "Books API"\n'
-                          '4. Maak credentials → API key\n'
-                          '5. Kopieer en plak hier\n\n'
-                          'Voordeel: 10.000 requests/dag ipv gedeelde quota',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.help_outline,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Help',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  _buildHelpItem(
-                    '🌐 Chrome/Web',
-                    'http://127.0.0.1:8000/api',
-                    'Gebruik localhost voor web development',
-                  ),
-                  const Divider(),
-                  _buildHelpItem(
-                    '📱 iPhone/Android',
-                    'http://[je-mac-ip]:8000/api',
-                    'Gebruik je Mac IP adres (check met ifconfig)',
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    '💡 Tips:',
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '• Zorg dat de Laravel server draait\n'
-                    '• Mac en iPhone op hetzelfde WiFi\n'
-                    '• Check server: ./check-server.sh\n'
-                    '• Herstart app na URL wijziging',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-              ),
-            ),
-          ),
+          const HelpCard(),
         ],
       ),
-    );
-  }
-
-  Widget _buildHelpItem(String title, String url, String description) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 4),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: SelectableText(
-            url,
-            style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          description,
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
-      ],
     );
   }
 }

@@ -1,36 +1,26 @@
 import 'dart:convert';
 import 'dart:async';
 import 'package:http/http.dart' as http;
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/book.dart';
 import '../config/app_config.dart';
 
 class ApiService {
-  static String? _cachedBaseUrl;
-  
-  // Automatisch kiezen tussen localhost (web) en netwerk IP (mobiel)
+  // Get API base URL from settings or AppConfig default
   static Future<String> getBaseUrl() async {
-    // Check for custom URL from settings
     final prefs = await SharedPreferences.getInstance();
     final customUrl = prefs.getString('api_base_url');
     
     if (customUrl != null && customUrl.isNotEmpty) {
-      _cachedBaseUrl = customUrl;
       return customUrl;
     }
     
     // Use AppConfig for platform-specific URLs
-    _cachedBaseUrl = AppConfig.apiBaseUrl;
-    
-    return _cachedBaseUrl!;
+    return AppConfig.apiBaseUrl;
   }
   
-  // Voor backwards compatibility en direct gebruik waar nodig
-  static String get baseUrl {
-    if (_cachedBaseUrl != null) return _cachedBaseUrl!;
-    return kIsWeb ? 'http://127.0.0.1:8000/api' : 'http://10.242.187.102:8000/api';
-  }
+  // Synchronous getter for direct usage (delegates to AppConfig)
+  static String get baseUrl => AppConfig.apiBaseUrl;
   
   static const Duration timeout = Duration(seconds: 15);
   static const Duration importTimeout = Duration(seconds: 45);

@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../models/book.dart';
 import '../services/api_service.dart';
+import '../services/google_books_service.dart';
 import '../utils/error_dialog.dart';
+import '../utils/date_formatter.dart';
 import '../widgets/cover_image.dart';
 
 class BookFormScreen extends StatefulWidget {
@@ -31,6 +30,7 @@ class _BookFormScreenState extends State<BookFormScreen> {
   final _endDateController = TextEditingController();
   final _coverUrlController = TextEditingController();
   final ApiService _apiService = ApiService();
+  final GoogleBooksService _googleBooksService = GoogleBooksService();
   
   String _selectedType = 'boek';
   String? _coverUrl;
@@ -51,51 +51,6 @@ class _BookFormScreenState extends State<BookFormScreen> {
     'graphic novel',
     'manga',
   ];
-
-  String _formatDateForDisplay(String? date) {
-    if (date == null || date.isEmpty) return '';
-    try {
-      // Google Books kan "2015", "2015-12" of "2015-12-08" retourneren
-      if (date.length == 4) {
-        // Alleen jaar: "2015" -> "01-01-2015"
-        return '01-01-$date';
-      } else if (date.length == 7) {
-        // Jaar-maand: "2015-12" -> "01-12-2015"
-        final parts = date.split('-');
-        return '01-${parts[1]}-${parts[0]}';
-      } else {
-        // Volledige datum parsen
-        final parsedDate = DateTime.parse(date);
-        return DateFormat('dd-MM-yyyy').format(parsedDate);
-      }
-    } catch (e) {
-      return date;
-    }
-  }
-
-  String _formatDateForApi(String? date) {
-    if (date == null || date.isEmpty) return '';
-    try {
-      // Probeer eerst dd-MM-yyyy formaat (van display)
-      final parsedDate = DateFormat('dd-MM-yyyy').parse(date);
-      return DateFormat('yyyy-MM-dd').format(parsedDate);
-    } catch (e) {
-      // Als dat faalt, check of het al een geldig yyyy-MM-dd formaat is
-      try {
-        final parsedDate = DateTime.parse(date);
-        return DateFormat('yyyy-MM-dd').format(parsedDate);
-      } catch (e2) {
-        // Als niets werkt, retourneer lege string in plaats van ongeldige datum
-        return '';
-      }
-    }
-  }
-
-  String? _formatDateForApiOrNull(String text) {
-    if (text.isEmpty) return null;
-    final formatted = _formatDateForApi(text);
-    return formatted.isEmpty ? null : formatted;
-  }
 
   Future<void> _selectDate(TextEditingController controller) async {
     DateTime? initialDate;
@@ -143,7 +98,7 @@ class _BookFormScreenState extends State<BookFormScreen> {
         _selectedType = 'boek'; // fallback to default
       }
       _publisherController.text = widget.book!.publisher ?? '';
-      _publicationDateController.text = _formatDateForDisplay(widget.book!.publicationDate);
+      _publicationDateController.text = DateFormatter.formatForDisplay(widget.book!.publicationDate);
       _coverUrl = widget.book!.coverUrl;
       _coverUrlController.text = widget.book!.coverUrl ?? '';
       _cabinetController.text = widget.book!.cabinet ?? '';
@@ -152,8 +107,8 @@ class _BookFormScreenState extends State<BookFormScreen> {
       _isRead = widget.book!.isRead;
       _hasSlipcase = widget.book!.hasSlipcase;
       _hasDustjacket = widget.book!.hasDustjacket;
-      _startDateController.text = _formatDateForDisplay(widget.book!.startDate);
-      _endDateController.text = _formatDateForDisplay(widget.book!.endDate);
+      _startDateController.text = DateFormatter.formatForDisplay(widget.book!.startDate);
+      _endDateController.text = DateFormatter.formatForDisplay(widget.book!.endDate);
     }
   }
 
@@ -188,104 +143,20 @@ class _BookFormScreenState extends State<BookFormScreen> {
     });
 
     try {
-      // Laad API key indien beschikbaar
-      final prefs = await SharedPreferences.getInstance();
-      final apiKey = prefs.getString('google_books_api_key');
-      
-      final allResults = <Map<String, dynamic>>[];
-      const resultsPerRequest = 40; // Gevraagd aantal (API geeft max ~20)
-      const maxTotalResults = 200; // Limiet om niet te lang te wachten
-      const maxPages = 10; // Maximum aantal pagina's (10 x 20 = 200 resultaten)
-      int pageCount = 0;
-      int? totalAvailable;
-      
-      // Bouw de juiste query op basis van zoektype
-      String searchQuery;
-      final authorText = _authorController.text.trim();
-      
-      switch (_searchType) {
-        case 'title':
-          // Voor korte titels (< 3 tekens) of algemene woorden, combineer met auteur indien beschikbaar
-          if (query.length <= 2 || ['it', 'if', 'go', 'on'].contains(query.toLowerCase())) {
-            if (authorText.isNotEmpty) {
-              // Combineer titel + auteur voor betere resultaten
-              searchQuery = 'intitle:${Uri.encodeComponent(query)}+inauthor:${Uri.encodeComponent(authorText)}';
-            } else {
-              // Als geen auteur, gebruik algemene zoekterm
-              searchQuery = Uri.encodeComponent(query);
-            }
-          } else {
-            searchQuery = 'intitle:${Uri.encodeComponent(query)}';
-          }
-          break;
-        case 'author':
-          searchQuery = 'inauthor:${Uri.encodeComponent(query)}';
-          break;
-        case 'isbn':
-          searchQuery = 'isbn:${Uri.encodeComponent(query)}';
-          break;
-        case 'all':
-        default:
-          searchQuery = Uri.encodeComponent(query);
-          break;
-      }
-      
-      // Loop door pagina's om alle beschikbare resultaten op te halen
-      while (allResults.length < maxTotalResults && pageCount < maxPages) {
-        final startIndex = pageCount * resultsPerRequest;
-        
-        // Bouw URL met optionele API key
-        var urlString = 'https://www.googleapis.com/books/v1/volumes?q=$searchQuery&langRestrict=$_selectedLanguage&maxResults=$resultsPerRequest&startIndex=$startIndex';
-        if (apiKey != null && apiKey.isNotEmpty) {
-          urlString += '&key=$apiKey';
-        }
-        final url = Uri.parse(urlString);
-        
-        final response = await http.get(url).timeout(const Duration(seconds: 10));
-        
-        if (response.statusCode == 200) {
-          final data = json.decode(response.body);
-          final items = data['items'] as List<dynamic>?;
-          
-          // Haal het totaal aantal beschikbare resultaten op (eerste keer)
-          if (totalAvailable == null && data['totalItems'] != null) {
-            totalAvailable = data['totalItems'] as int;
-          }
-          
-          // Voeg resultaten toe
-          if (items != null && items.isNotEmpty) {
-            allResults.addAll(items.cast<Map<String, dynamic>>());
-            pageCount++;
-            
-            // Als we alle beschikbare resultaten hebben opgehaald
-            if (totalAvailable != null && allResults.length >= totalAvailable) {
-              break;
-            }
-            
-            // Kleine pauze tussen requests om rate limiting te vermijden
-            if (pageCount < maxPages) {
-              await Future.delayed(const Duration(milliseconds: 100));
-            }
-          } else {
-            // Geen items in deze response, stop
-            break;
-          }
-        } else if (response.statusCode == 429) {
-          // Rate limit bereikt
-          break;
-        } else {
-          // Andere fout, stop
-          break;
-        }
-      }
+      final result = await _googleBooksService.searchBooks(
+        query: query,
+        searchType: _searchType,
+        language: _selectedLanguage,
+        authorForCombo: _authorController.text.trim(),
+      );
 
       setState(() {
-        _searchResults = allResults;
-        _showSearchResults = allResults.isNotEmpty;
+        _searchResults = result.books;
+        _showSearchResults = result.books.isNotEmpty;
         _isLoading = false;
       });
 
-      if (allResults.isEmpty) {
+      if (result.books.isEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Geen boeken gevonden')),
@@ -295,29 +166,39 @@ class _BookFormScreenState extends State<BookFormScreen> {
         // Toon aantal gevonden resultaten
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${allResults.length} resultaten gevonden${totalAvailable != null && allResults.length < totalAvailable ? ' (van ${totalAvailable} totaal)' : ''}'),
+            content: Text('${result.books.length} resultaten gevonden${result.books.length < result.totalAvailable ? ' (van ${result.totalAvailable} totaal)' : ''}'),
             duration: const Duration(seconds: 2),
           ),
+        );
+      }
+    } on GoogleBooksQuotaException {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        showErrorDialog(
+          context,
+          'Google Books dagelijks quota bereikt',
+          'Het dagelijkse zoeklimiet van Google Books is bereikt.\n\n'
+          'Dit reset automatisch om middernacht (UTC). '
+          'Je kunt nu het boek handmatig toevoegen door de velden hieronder in te vullen.',
+        );
+      }
+    } on GoogleBooksServiceException {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        showErrorDialog(
+          context,
+          'Google Books tijdelijk niet beschikbaar',
+          'De Google Books service is momenteel overbelast of in onderhoud.\n\n'
+          'Probeer het over een paar minuten opnieuw, of voeg het boek handmatig toe.',
         );
       }
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
-        // Specifieke foutmelding voor Google Books API problemen
         String title = 'Fout bij zoeken';
         String message;
         
-        if (e.toString().contains('429') || e.toString().contains('quota') || 
-            e.toString().contains('rate limit') || e.toString().contains('RATE_LIMIT_EXCEEDED')) {
-          title = 'Google Books dagelijks quota bereikt';
-          message = 'Het dagelijkse zoeklimiet van Google Books is bereikt.\n\n'
-                   'Dit reset automatisch om middernacht (UTC). '
-                   'Je kunt nu het boek handmatig toevoegen door de velden hieronder in te vullen.';
-        } else if (e.toString().contains('503') || e.toString().contains('Service Unavailable')) {
-          title = 'Google Books tijdelijk niet beschikbaar';
-          message = 'De Google Books service is momenteel overbelast of in onderhoud.\n\n'
-                   'Probeer het over een paar minuten opnieuw, of voeg het boek handmatig toe door de velden hieronder in te vullen.';
-        } else if (e.toString().contains('TimeoutException') || e.toString().contains('timed out')) {
+        if (e.toString().contains('TimeoutException') || e.toString().contains('timed out')) {
           title = 'Verbinding verlopen';
           message = 'De verbinding met Google Books duurde te lang.\n\n'
                    'Controleer je internetverbinding en probeer opnieuw.';
@@ -337,32 +218,15 @@ class _BookFormScreenState extends State<BookFormScreen> {
   }
 
   void _selectBook(Map<String, dynamic> book) {
-    final volumeInfo = book['volumeInfo'] as Map<String, dynamic>;
+    final bookData = _googleBooksService.extractBookData(book);
     
-    _titleController.text = volumeInfo['title'] ?? '';
-    
-    final authors = volumeInfo['authors'] as List<dynamic>?;
-    _authorController.text = authors?.join(', ') ?? '';
-    
-    final identifiers = volumeInfo['industryIdentifiers'] as List<dynamic>?;
-    if (identifiers != null && identifiers.isNotEmpty) {
-      _isbnController.text = identifiers.first['identifier'] ?? '';
-    }
-
-    _publisherController.text = volumeInfo['publisher'] ?? '';
-    final publishedDate = volumeInfo['publishedDate'] ?? '';
-    _publicationDateController.text = _formatDateForDisplay(publishedDate);
-
-    final imageLinks = volumeInfo['imageLinks'] as Map<String, dynamic>?;
-    final rawCoverUrl = imageLinks?['thumbnail'] ?? imageLinks?['smallThumbnail'];
-    if (rawCoverUrl is String) {
-      // Zorg dat het HTTPS is en verwijder edge curl parameter voor betere kwaliteit
-      var cleanUrl = rawCoverUrl.replaceFirst('http://', 'https://');
-      cleanUrl = cleanUrl.replaceAll('&edge=curl', '');
-      cleanUrl = cleanUrl.replaceAll('edge=curl', '');
-      _coverUrl = cleanUrl;
-      _coverUrlController.text = cleanUrl;
-    }
+    _titleController.text = bookData['title'];
+    _authorController.text = bookData['author'];
+    _isbnController.text = bookData['isbn'] ?? '';
+    _publisherController.text = bookData['publisher'] ?? '';
+    _publicationDateController.text = DateFormatter.formatForDisplay(bookData['publishedDate']);
+    _coverUrl = bookData['coverUrl'];
+    _coverUrlController.text = bookData['coverUrl'] ?? '';
 
     setState(() {
       _showSearchResults = false;
@@ -390,13 +254,7 @@ class _BookFormScreenState extends State<BookFormScreen> {
       // Automatisch jaar extraheren uit einddatum
       int? yearRead;
       if (_endDateController.text.isNotEmpty) {
-        try {
-          final endDate = DateFormat('dd-MM-yyyy').parse(_endDateController.text);
-          yearRead = endDate.year;
-        } catch (e) {
-          // Als einddatum niet geparsed kan worden, blijft yearRead null
-          yearRead = null;
-        }
+        yearRead = DateFormatter.extractYearFromDisplayDate(_endDateController.text);
       }
 
       final bookData = {
@@ -405,7 +263,7 @@ class _BookFormScreenState extends State<BookFormScreen> {
         'isbn': _isbnController.text.isEmpty ? null : _isbnController.text,
         'type': _selectedType,
         'publisher': _publisherController.text.isEmpty ? null : _publisherController.text,
-        'publication_date': _formatDateForApiOrNull(_publicationDateController.text),
+        'publication_date': DateFormatter.formatForApiOrNull(_publicationDateController.text),
         'cover_url': _coverUrl,
         'has_slipcase': _hasSlipcase ? 1 : 0,
         'has_dustjacket': _hasDustjacket ? 1 : 0,
@@ -413,8 +271,8 @@ class _BookFormScreenState extends State<BookFormScreen> {
         'shelf': _shelfController.text.isEmpty ? null : _shelfController.text,
         'position': position,
         'is_read': _isRead ? 1 : 0,
-        'start_date': _formatDateForApiOrNull(_startDateController.text),
-        'end_date': _formatDateForApiOrNull(_endDateController.text),
+        'start_date': DateFormatter.formatForApiOrNull(_startDateController.text),
+        'end_date': DateFormatter.formatForApiOrNull(_endDateController.text),
         'year_read': yearRead,
       };
 
