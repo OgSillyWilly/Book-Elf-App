@@ -532,7 +532,7 @@ class _BooksListScreenState extends State<BooksListScreen> {
                       children: [
                         Expanded(
                           child: DropdownButtonFormField<String?>(
-                            value: _ratingFilter,
+                            initialValue: _ratingFilter,
                             decoration: const InputDecoration(
                               labelText: 'Beoordeling',
                               prefixIcon: Icon(Icons.star_outline, size: 20),

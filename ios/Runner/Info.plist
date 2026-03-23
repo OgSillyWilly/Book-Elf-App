@@ -52,5 +52,9 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>We hebben toegang tot je camera nodig om foto's te maken van boeken</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>We hebben toegang tot je fotobibliotheek nodig om boekomslagen te selecteren</string>
 </dict>
 </plist>

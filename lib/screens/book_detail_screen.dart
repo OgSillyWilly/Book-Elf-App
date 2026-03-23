@@ -255,14 +255,14 @@ class BookDetailScreen extends StatelessWidget {
           
           _buildInfoRow(
             context,
-            Icons.inventory_2,
+            Icons.storage,
             'Dustjacket',
             book.hasDustjacket ? 'Ja' : 'Nee',
           ),
           
           _buildInfoRow(
             context,
-            Icons.cases,
+            Icons.layers,
             'Slipcase',
             book.hasSlipcase ? 'Ja' : 'Nee',
           ),

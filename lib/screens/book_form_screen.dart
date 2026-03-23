@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:intl/intl.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import '../constants/book_types.dart';
 import '../models/book.dart';
 import '../services/api_service.dart';
 import '../services/google_books_service.dart';
+import '../services/image_upload_service.dart';
 import '../utils/error_dialog.dart';
 import '../utils/date_formatter.dart';
 import '../widgets/cover_image.dart';
@@ -45,15 +50,6 @@ class _BookFormScreenState extends State<BookFormScreen> {
   String _selectedLanguage = 'nl';
   String _searchType = 'title'; // title, author, isbn, all
 
-  final List<String> _bookTypes = [
-    'boek',
-    'bundel',
-    'novella',
-    'strip',
-    'graphic novel',
-    'manga',
-  ];
-
   Future<void> _selectDate(TextEditingController controller) async {
     DateTime? initialDate;
     final DateTime minDate = DateTime(1900);
@@ -94,7 +90,7 @@ class _BookFormScreenState extends State<BookFormScreen> {
       _authorController.text = widget.book!.author;
       _isbnController.text = widget.book!.isbn ?? '';
       // Ensure selected type is in the list, otherwise use default
-      if (_bookTypes.contains(widget.book!.type)) {
+      if (BookTypes.all.contains(widget.book!.type)) {
         _selectedType = widget.book!.type;
       } else {
         _selectedType = 'boek'; // fallback to default
@@ -235,6 +231,163 @@ class _BookFormScreenState extends State<BookFormScreen> {
       _showSearchResults = false;
       _searchResults = [];
     });
+  }
+
+  Future<void> _pickImageFromCamera() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 1024,
+        maxHeight: 1536,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        await _uploadCoverImage(image);
+      }
+    } catch (e) {
+      if (mounted) {
+        showErrorDialog(
+          context,
+          'Fout bij camera',
+          'Kon geen foto maken: $e',
+        );
+      }
+    }
+  }
+
+  Future<void> _pickImageFromGallery() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        maxHeight: 1536,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        await _uploadCoverImage(image);
+      }
+    } catch (e) {
+      if (mounted) {
+        showErrorDialog(
+          context,
+          'Fout bij galerij',
+          'Kon geen afbeelding kiezen: $e',
+        );
+      }
+    }
+  }
+
+  Future<void> _uploadCoverImage(XFile imageFile) async {
+    // Need to save book first if it's new
+    if (widget.book == null) {
+      if (mounted) {
+        showErrorDialog(
+          context,
+          'Sla eerst op',
+          'Sla het boek eerst op voordat je een cover toevoegt.',
+        );
+      }
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      String? coverUrl;
+      
+      if (kIsWeb) {
+        // Web platform: use bytes
+        final bytes = await imageFile.readAsBytes();
+        coverUrl = await ImageUploadService.uploadBookCoverFromBytes(
+          widget.book!.id!,
+          bytes,
+          imageFile.name,
+        );
+      } else {
+        // Mobile/Desktop platform: use File
+        coverUrl = await ImageUploadService.uploadBookCover(
+          widget.book!.id!,
+          File(imageFile.path),
+        );
+      }
+
+      setState(() {
+        _coverUrl = coverUrl;
+        _coverUrlController.text = coverUrl ?? '';
+        _isLoading = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Cover succesvol geüpload')),
+        );
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        showErrorDialog(
+          context,
+          'Upload mislukt',
+          'Kon cover niet uploaden: $e',
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteCover() async {
+    if (widget.book == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cover verwijderen?'),
+        content: const Text('Weet je zeker dat je de cover wilt verwijderen?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Annuleren'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Verwijderen'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      await ImageUploadService.deleteBookCover(widget.book!.id!);
+
+      setState(() {
+        _coverUrl = null;
+        _coverUrlController.clear();
+        _isLoading = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Cover verwijderd')),
+        );
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        showErrorDialog(
+          context,
+          'Verwijderen mislukt',
+          'Kon cover niet verwijderen: $e',
+        );
+      }
+    }
   }
 
   Future<void> _saveBook() async {
@@ -472,6 +625,73 @@ class _BookFormScreenState extends State<BookFormScreen> {
                       });
                     },
                   ),
+                  const SizedBox(height: 12),
+
+                  // Photo upload buttons (only for existing books)
+                  if (widget.book != null) ...[
+                    // Warning for web users
+                    if (kIsWeb) ...[
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.shade50,
+                          border: Border.all(color: Colors.orange.shade200),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.info_outline, color: Colors.orange.shade700, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Let op: Foto uploaden werkt het beste op mobiele apparaten. '
+                                'In de browser kun je wel de Cover URL gebruiken.',
+                                style: TextStyle(fontSize: 12, color: Colors.orange.shade900),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                    Row(
+                      children: [
+                        if (!kIsWeb)
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: _isLoading ? null : _pickImageFromCamera,
+                              icon: const Icon(Icons.camera_alt),
+                              label: const Text('Foto maken'),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                              ),
+                            ),
+                          ),
+                        if (!kIsWeb) const SizedBox(width: 12),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _isLoading ? null : _pickImageFromGallery,
+                            icon: const Icon(Icons.photo_library),
+                            label: Text(kIsWeb ? 'Bestand kiezen' : 'Uit galerij'),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (_coverUrl != null && _coverUrl!.contains('/storage/covers/')) ...[
+                      const SizedBox(height: 8),
+                      TextButton.icon(
+                        onPressed: _isLoading ? null : _deleteCover,
+                        icon: const Icon(Icons.delete, size: 18),
+                        label: const Text('Geüploade cover verwijderen'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.red,
+                        ),
+                      ),
+                    ],
+                  ],
                   const SizedBox(height: 16),
 
                   DropdownButtonFormField<String>(
@@ -481,7 +701,7 @@ class _BookFormScreenState extends State<BookFormScreen> {
                       filled: true,
                       border: OutlineInputBorder(),
                     ),
-                    items: _bookTypes.map((type) {
+                    items: BookTypes.all.map((type) {
                       return DropdownMenuItem(value: type, child: Text(type));
                     }).toList(),
                     onChanged: (value) {

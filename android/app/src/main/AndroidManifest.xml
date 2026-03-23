@@ -2,6 +2,14 @@
     <!-- Required for API calls -->
     <uses-permission android:name="android.permission.INTERNET" />
     
+    <!-- Camera and photo permissions -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    
     <application
         android:label="bookshelf_app"
         android:name="${applicationName}"
