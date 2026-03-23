@@ -6,9 +6,13 @@ import '../utils/error_dialog.dart';
 import '../utils/book_filter.dart';
 import '../utils/book_sorter.dart';
 import '../widgets/cover_image.dart';
+import '../widgets/book_grid_item.dart';
+import '../widgets/rating_stars.dart';
 import 'book_form_screen.dart';
 import 'settings_screen.dart';
 import 'reading_history_screen.dart';
+import 'statistics_screen.dart';
+import 'book_detail_screen.dart';
 
 class BooksListScreen extends StatefulWidget {
   const BooksListScreen({
@@ -36,9 +40,11 @@ class _BooksListScreenState extends State<BooksListScreen> {
   String? _typeFilter; // null = all types
   int? _yearFilter; // null = all years
   String? _cabinetFilter; // null = all cabinets
+  String? _ratingFilter; // null/all = all ratings, '5', '4+', '3+', '2+', '1+', 'unrated'
   String _sortBy = 'none'; // 'none', 'title', 'author', 'cabinet'
   bool _isSelectionMode = false;
   final Set<int> _selectedBookIds = {};
+  String _viewMode = 'list'; // 'list' or 'grid'
 
   @override
   void initState() {
@@ -83,6 +89,7 @@ class _BooksListScreenState extends State<BooksListScreen> {
         typeFilter: _typeFilter,
         yearFilter: _yearFilter,
         cabinetFilter: _cabinetFilter,
+        ratingFilter: _ratingFilter,
       );
       
       // Apply sorting using BookSorter utility
@@ -271,8 +278,15 @@ class _BooksListScreenState extends State<BooksListScreen> {
                 ),
               ]
             : [
-                IconButton(
-                  icon: const Icon(Icons.checklist),
+                IconButton(                  icon: Icon(_viewMode == 'grid' ? Icons.view_list : Icons.grid_view),
+                  tooltip: _viewMode == 'grid' ? 'Lijstweergave' : 'Galerij weergave',
+                  onPressed: () {
+                    setState(() {
+                      _viewMode = _viewMode == 'list' ? 'grid' : 'list';
+                    });
+                  },
+                ),
+                IconButton(                  icon: const Icon(Icons.checklist),
                   tooltip: 'Selecteer meerdere boeken',
                   onPressed: _enterSelectionMode,
                 ),
@@ -293,6 +307,11 @@ class _BooksListScreenState extends State<BooksListScreen> {
                         context,
                         MaterialPageRoute(builder: (context) => const ReadingHistoryScreen()),
                       );
+                    } else if (value == 'statistics') {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => StatisticsScreen(books: _allBooks)),
+                      );
                     }
                   },
                   itemBuilder: (context) => [
@@ -303,6 +322,16 @@ class _BooksListScreenState extends State<BooksListScreen> {
                           Icon(Icons.history),
                           SizedBox(width: 8),
                           Text('Leesgeschiedenis'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'statistics',
+                      child: Row(
+                        children: [
+                          Icon(Icons.bar_chart),
+                          SizedBox(width: 8),
+                          Text('Statistieken'),
                         ],
                       ),
                     ),
@@ -498,7 +527,41 @@ class _BooksListScreenState extends State<BooksListScreen> {
                       ],
                     ),
                     const SizedBox(height: 12),
-                    // Compact sort dropdown - Row 3
+                    // Rating filter - Row 3
+                    Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<String?>(
+                            value: _ratingFilter,
+                            decoration: const InputDecoration(
+                              labelText: 'Beoordeling',
+                              prefixIcon: Icon(Icons.star_outline, size: 20),
+                              contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                              isDense: true,
+                            ),
+                            isExpanded: true,
+                            items: const [
+                              DropdownMenuItem(value: null, child: Text('Alle', overflow: TextOverflow.ellipsis)),
+                              DropdownMenuItem(value: '5', child: Text('★★★★★ (5)', overflow: TextOverflow.ellipsis)),
+                              DropdownMenuItem(value: '4', child: Text('★★★★☆ (4)', overflow: TextOverflow.ellipsis)),
+                              DropdownMenuItem(value: '3', child: Text('★★★☆☆ (3)', overflow: TextOverflow.ellipsis)),
+                              DropdownMenuItem(value: '2', child: Text('★★☆☆☆ (2)', overflow: TextOverflow.ellipsis)),
+                              DropdownMenuItem(value: '1', child: Text('★☆☆☆☆ (1)', overflow: TextOverflow.ellipsis)),
+                              DropdownMenuItem(value: 'unrated', child: Text('Onbeoordeeld', overflow: TextOverflow.ellipsis)),
+                            ],
+                            onChanged: (value) {
+                              setState(() => _ratingFilter = value);
+                              _filterBooks();
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Empty space to match the 2-column layout
+                        const Expanded(child: SizedBox()),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    // Compact sort dropdown - Row 4
                     Row(
                       children: [
                         // Sort dropdown
@@ -559,7 +622,9 @@ class _BooksListScreenState extends State<BooksListScreen> {
                     : _filteredBooks.isEmpty
                         ? Center(
                             child: Text(
-                              _searchController.text.isNotEmpty || _readFilter != 'all'
+                              _searchController.text.isNotEmpty || _readFilter != 'all' || 
+                                  _typeFilter != null || _yearFilter != null || 
+                                  _cabinetFilter != null || _ratingFilter != null
                                   ? 'Geen boeken gevonden met deze filters'
                                   : 'Geen boeken gevonden.\nTap op + om een boek toe te voegen.',
                               textAlign: TextAlign.center,
@@ -569,137 +634,152 @@ class _BooksListScreenState extends State<BooksListScreen> {
                         : RefreshIndicator(
                             color: Theme.of(context).colorScheme.primary,
                             onRefresh: _loadBooks,
-                            child: ListView.builder(
-                              itemCount: _filteredBooks.length,
-                              itemBuilder: (context, index) {
-                                final book = _filteredBooks[index];
-                                if (book.id == null) return const SizedBox.shrink();
-                                
-                                return InkWell(
-                                  onTap: _isSelectionMode
-                                      ? () => _toggleBookSelection(book.id!)
-                                      : null,
-                                  child: Card(
-                                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                    child: ExpansionTile(
-                                    key: ValueKey('${book.id}_$_isSelectionMode'),
-                                    tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                    childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(16),
+                            child: _viewMode == 'grid'
+                                ? GridView.builder(
+                                    padding: const EdgeInsets.all(16),
+                                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: 5,
+                                      childAspectRatio: 0.6,
+                                      crossAxisSpacing: 8,
+                                      mainAxisSpacing: 8,
                                     ),
-                                    collapsedShape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(16),
-                                    ),
-                                    initiallyExpanded: false,
-                                    leading: _isSelectionMode
-                                        ? Checkbox(
-                                            value: _selectedBookIds.contains(book.id),
-                                            onChanged: (selected) {
-                                              _toggleBookSelection(book.id!);
-                                            },
-                                          )
-                                        : book.coverUrl != null && book.coverUrl!.isNotEmpty
-                                        ? ClipRRect(
-                                            borderRadius: BorderRadius.circular(10),
-                                            child: CoverImage(
-                                              imageUrl: book.coverUrl!,
-                                              width: 48,
-                                              height: 64,
-                                              fit: BoxFit.cover,
-                                            ),
-                                          )
-                                        : CircleAvatar(
-                                            backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-                                            child: Text(
-                                              book.title.isNotEmpty ? book.title[0].toUpperCase() : 'B',
-                                              style: TextStyle(color: Theme.of(context).colorScheme.primary),
-                                            ),
-                                          ),
-                                    title: SelectableText(
-                                      book.title,
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w700,
-                                        color: Theme.of(context).colorScheme.onSurface,
-                                      ),
-                                    ),
-                                    subtitle: Padding(
-                                      padding: const EdgeInsets.only(top: 6),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          SelectableText('Auteur: ${book.author}'),
-                                          SelectableText('Type: ${book.type}'),
-                                          if (book.cabinet != null || book.shelf != null || book.position != null)
-                                            SelectableText(
-                                              'Locatie: ${[
-                                                if (book.cabinet != null) 'Kast ${book.cabinet}',
-                                                if (book.shelf != null) 'Plank ${book.shelf}',
-                                                if (book.position != null) 'Positie ${book.position}',
-                                              ].join(', ')}',
-                                              style: TextStyle(
-                                                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                              ),
-                                            ),
-                                          const SizedBox(height: 4),
-                                          Row(
-                                            children: [
-                                              Icon(
-                                                book.isRead ? Icons.check_circle : Icons.radio_button_unchecked,
-                                                size: 16,
-                                                color: book.isRead ? Colors.green : Colors.grey,
-                                              ),
-                                              const SizedBox(width: 6),
-                                              Text(
-                                                book.isRead ? 'Gelezen' : 'Ongelezen',
-                                                style: TextStyle(
-                                                  color: book.isRead ? Colors.green : Colors.grey,
-                                                  fontWeight: FontWeight.w600,
+                                    itemCount: _filteredBooks.length,
+                                    itemBuilder: (context, index) {
+                                      final book = _filteredBooks[index];
+                                      if (book.id == null) return const SizedBox.shrink();
+                                      
+                                      return BookGridItem(
+                                        book: book,
+                                        isSelected: _isSelectionMode && _selectedBookIds.contains(book.id),
+                                        onTap: _isSelectionMode
+                                            ? () => _toggleBookSelection(book.id!)
+                                            : () {
+                                                Navigator.push(
+                                                  context,
+                                                  MaterialPageRoute(
+                                                    builder: (context) => BookDetailScreen(
+                                                      book: book,
+                                                      onBookUpdated: _loadBooks,
+                                                      onBookDeleted: () {
+                                                        _deleteBook(book.id!);
+                                                      },
+                                                    ),
+                                                  ),
+                                                ).then((_) => _loadBooks());
+                                              },
+                                        onLongPress: () {
+                                          if (!_isSelectionMode) {
+                                            _enterSelectionMode();
+                                            _toggleBookSelection(book.id!);
+                                          }
+                                        },
+                                      );
+                                    },
+                                  )
+                                : ListView.builder(
+                                    itemCount: _filteredBooks.length,
+                                    itemBuilder: (context, index) {
+                                      final book = _filteredBooks[index];
+                                      if (book.id == null) return const SizedBox.shrink();
+                                      
+                                      return Card(
+                                        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                        child: ListTile(
+                                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                          leading: _isSelectionMode
+                                              ? Checkbox(
+                                                  value: _selectedBookIds.contains(book.id),
+                                                  onChanged: (selected) {
+                                                    _toggleBookSelection(book.id!);
+                                                  },
+                                                )
+                                              : book.coverUrl != null && book.coverUrl!.isNotEmpty
+                                              ? ClipRRect(
+                                                  borderRadius: BorderRadius.circular(10),
+                                                  child: CoverImage(
+                                                    imageUrl: book.coverUrl!,
+                                                    width: 48,
+                                                    height: 64,
+                                                    fit: BoxFit.cover,
+                                                  ),
+                                                )
+                                              : CircleAvatar(
+                                                  backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                                                  child: Text(
+                                                    book.title.isNotEmpty ? book.title[0].toUpperCase() : 'B',
+                                                    style: TextStyle(color: Theme.of(context).colorScheme.primary),
+                                                  ),
                                                 ),
-                                              ),
-                                            ],
+                                          title: Text(
+                                            book.title,
+                                            style: const TextStyle(fontWeight: FontWeight.w700),
                                           ),
-                                        ],
-                                      ),
-                                    ),
-                                    children: _isSelectionMode
-                                        ? []
-                                        : [
-                                            Column(
+                                          subtitle: Padding(
+                                            padding: const EdgeInsets.only(top: 6),
+                                            child: Column(
                                               crossAxisAlignment: CrossAxisAlignment.start,
                                               children: [
-                                                if (book.isbn != null) Text('ISBN: ${book.isbn}'),
-                                                if (book.publisher != null) Text('Uitgever: ${book.publisher}'),
-                                                if (book.publicationDate != null)
-                                                  Text('Publicatiedatum: ${book.publicationDate}'),
-                                                if (book.startDate != null) Text('Begonnen: ${book.startDate}'),
-                                                if (book.endDate != null) Text('Uitgelezen: ${book.endDate}'),
-                                                const SizedBox(height: 12),
-                                                Row(
-                                                  mainAxisAlignment: MainAxisAlignment.end,
-                                                  children: [
-                                                    OutlinedButton.icon(
-                                                      onPressed: () => _navigateToForm(book),
-                                                      icon: const Icon(Icons.edit, size: 18),
-                                                      label: const Text('Bewerken'),
+                                                Text('Auteur: ${book.author}'),
+                                                Text('Type: ${book.type}'),
+                                                if (book.isRead && book.rating != null && book.rating! > 0) ...[
+                                                  const SizedBox(height: 4),
+                                                  RatingStars(rating: book.rating!, size: 18),
+                                                ],
+                                                if (book.cabinet != null || book.shelf != null || book.position != null)
+                                                  Text(
+                                                    'Locatie: ${[
+                                                      if (book.cabinet != null) 'Kast ${book.cabinet}',
+                                                      if (book.shelf != null) 'Plank ${book.shelf}',
+                                                      if (book.position != null) 'Positie ${book.position}',
+                                                    ].join(', ')}',
+                                                    style: TextStyle(
+                                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                                                     ),
-                                                    const SizedBox(width: 8),
-                                                    OutlinedButton.icon(
-                                                      onPressed: () => _deleteBook(book.id!),
-                                                      icon: const Icon(Icons.delete, size: 18),
-                                                      label: const Text('Verwijderen'),
-                                                      style: OutlinedButton.styleFrom(
-                                                        foregroundColor: Colors.red,
+                                                  ),
+                                                const SizedBox(height: 4),
+                                                Row(
+                                                  children: [
+                                                    Icon(
+                                                      book.isRead ? Icons.check_circle : Icons.radio_button_unchecked,
+                                                      size: 16,
+                                                      color: book.isRead ? Colors.green : Colors.grey,
+                                                    ),
+                                                    const SizedBox(width: 6),
+                                                    Text(
+                                                      book.isRead ? 'Gelezen' : 'Ongelezen',
+                                                      style: TextStyle(
+                                                        color: book.isRead ? Colors.green : Colors.grey,
+                                                        fontWeight: FontWeight.w600,
                                                       ),
                                                     ),
                                                   ],
                                                 ),
                                               ],
                                             ),
-                                          ],
-                                  ),
-                                ),
-                              );
+                                          ),
+                                          trailing: _isSelectionMode
+                                              ? null
+                                              : const Icon(Icons.chevron_right),
+                                          onTap: () {
+                                            if (_isSelectionMode) {
+                                              _toggleBookSelection(book.id!);
+                                            } else {
+                                              Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (context) => BookDetailScreen(
+                                                    book: book,
+                                                    onBookUpdated: _loadBooks,
+                                                    onBookDeleted: () {
+                                                      _deleteBook(book.id!);
+                                                    },
+                                                  ),
+                                                ),
+                                              ).then((_) => _loadBooks());
+                                            }
+                                          },
+                                        ),
+                                      );
                             },
                           ),
                         ),

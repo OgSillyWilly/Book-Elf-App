@@ -75,7 +75,7 @@ class _MyAppState extends State<MyApp> {
 
   ThemeData _buildLightTheme() {
     final colorScheme = ColorScheme.fromSeed(
-      seedColor: const Color(0xFF6D4C41),
+      seedColor: const Color(0xFF5D4037),
       brightness: Brightness.light,
     );
 

@@ -43,6 +43,29 @@ class BookFilter {
     return book.cabinet != null && book.cabinet == cabinetFilter;
   }
 
+  /// Filter books by rating
+  static bool matchesRating(Book book, String? ratingFilter) {
+    if (ratingFilter == null || ratingFilter == 'all') return true;
+    
+    final rating = book.rating ?? 0;
+    
+    // Unrated: books that are not read or have no rating
+    if (ratingFilter == 'unrated') {
+      return !book.isRead || rating == 0;
+    }
+    
+    // For rated filters, only show read books
+    if (!book.isRead) return false;
+    
+    if (ratingFilter == '5') return rating == 5;
+    if (ratingFilter == '4') return rating == 4;
+    if (ratingFilter == '3') return rating == 3;
+    if (ratingFilter == '2') return rating == 2;
+    if (ratingFilter == '1') return rating == 1;
+    
+    return true;
+  }
+
   /// Apply all filters to a list of books
   static List<Book> applyFilters(
     List<Book> books, {
@@ -51,13 +74,15 @@ class BookFilter {
     String? typeFilter,
     int? yearFilter,
     String? cabinetFilter,
+    String? ratingFilter,
   }) {
     return books.where((book) {
       return matchesSearch(book, searchQuery) &&
           matchesReadStatus(book, readFilter) &&
           matchesType(book, typeFilter) &&
           matchesYear(book, yearFilter) &&
-          matchesCabinet(book, cabinetFilter);
+          matchesCabinet(book, cabinetFilter) &&
+          matchesRating(book, ratingFilter);
     }).toList();
   }
 

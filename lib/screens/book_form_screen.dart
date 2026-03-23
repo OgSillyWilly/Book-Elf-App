@@ -6,6 +6,7 @@ import '../services/google_books_service.dart';
 import '../utils/error_dialog.dart';
 import '../utils/date_formatter.dart';
 import '../widgets/cover_image.dart';
+import '../widgets/rating_stars.dart';
 
 class BookFormScreen extends StatefulWidget {
   final Book? book;
@@ -35,6 +36,7 @@ class _BookFormScreenState extends State<BookFormScreen> {
   String _selectedType = 'boek';
   String? _coverUrl;
   bool _isRead = false;
+  int _rating = 0;
   bool _hasSlipcase = false;
   bool _hasDustjacket = false;
   bool _isLoading = false;
@@ -105,6 +107,7 @@ class _BookFormScreenState extends State<BookFormScreen> {
       _shelfController.text = widget.book!.shelf ?? '';
       _positionController.text = widget.book!.position?.toString() ?? '';
       _isRead = widget.book!.isRead;
+      _rating = widget.book!.rating ?? 0;
       _hasSlipcase = widget.book!.hasSlipcase;
       _hasDustjacket = widget.book!.hasDustjacket;
       _startDateController.text = DateFormatter.formatForDisplay(widget.book!.startDate);
@@ -271,6 +274,7 @@ class _BookFormScreenState extends State<BookFormScreen> {
         'shelf': _shelfController.text.isEmpty ? null : _shelfController.text,
         'position': position,
         'is_read': _isRead ? 1 : 0,
+        'rating': _rating > 0 ? _rating : null,
         'start_date': DateFormatter.formatForApiOrNull(_startDateController.text),
         'end_date': DateFormatter.formatForApiOrNull(_endDateController.text),
         'year_read': yearRead,
@@ -570,7 +574,39 @@ class _BookFormScreenState extends State<BookFormScreen> {
                       setState(() => _isRead = value ?? false);
                     },
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 8),
+                  
+                  // Rating (alleen zichtbaar bij gelezen boeken)
+                  if (_isRead) ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Row(
+                        children: [
+                          const Text('Beoordeling:', style: TextStyle(fontSize: 16)),
+                          const SizedBox(width: 16),
+                          RatingStars(
+                            rating: _rating,
+                            editable: true,
+                            size: 32,
+                            onRatingChanged: (newRating) {
+                              setState(() => _rating = newRating);
+                            },
+                          ),
+                          if (_rating > 0) ...[
+                            const SizedBox(width: 8),
+                            IconButton(
+                              icon: const Icon(Icons.clear, size: 20),
+                              tooltip: 'Verwijder beoordeling',
+                              onPressed: () {
+                                setState(() => _rating = 0);
+                              },
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
                   
                   TextFormField(
                     controller: _startDateController,

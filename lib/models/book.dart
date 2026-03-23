@@ -16,6 +16,7 @@ class Book {
   final String? startDate;
   final String? endDate;
   final int? yearRead;
+  final int? rating; // 0-5 stars
 
   Book({
     this.id,
@@ -35,6 +36,7 @@ class Book {
     this.startDate,
     this.endDate,
     this.yearRead,
+    this.rating,
   });
 
   factory Book.fromJson(Map<String, dynamic> json) {
@@ -75,6 +77,7 @@ class Book {
       startDate: json['start_date']?.toString(),
       endDate: json['end_date']?.toString(),
       yearRead: parseIntSafely(json['year_read']),
+      rating: parseIntSafely(json['rating']),
     );
   }
 
@@ -96,6 +99,7 @@ class Book {
       'start_date': startDate,
       'end_date': endDate,
       'year_read': yearRead,
+      'rating': rating,
     };
   }
 }
