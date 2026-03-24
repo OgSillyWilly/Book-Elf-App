@@ -5,6 +5,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/book.dart';
 import '../config/app_config.dart';
 
+class BooksResponse {
+  final List<Book> books;
+  final int total;
+
+  BooksResponse({required this.books, required this.total});
+}
+
 class ApiService {
   // Get API base URL from settings or AppConfig default
   static Future<String> getBaseUrl() async {
@@ -49,8 +56,60 @@ class ApiService {
       ).timeout(timeout);
       
       if (response.statusCode == 200) {
-        List<dynamic> data = json.decode(response.body);
+        final responseData = json.decode(response.body);
+        
+        // Handle new API response structure with data and total
+        List<dynamic> data;
+        if (responseData is Map && responseData.containsKey('data')) {
+          data = responseData['data'];
+        } else if (responseData is List) {
+          // Fallback for old API response format
+          data = responseData;
+        } else {
+          throw Exception('Onverwachte API response structuur');
+        }
+        
         return data.map((json) => Book.fromJson(json)).toList();
+      } else {
+        throw Exception('Server antwoordde met status ${response.statusCode}');
+      }
+    } on TimeoutException {
+      final url = await getBaseUrl();
+      throw Exception('Verbinding timeout - controleer of de server draait op $url');
+    } catch (e) {
+      throw Exception('Verbindingsfout: ${e.toString()}');
+    }
+  }
+
+  // Nieuwe methode die ook het totaal aantal resultaten retourneert
+  Future<BooksResponse> getBooksWithTotal() async {
+    try {
+      final url = await getBaseUrl();
+      final response = await http.get(
+        Uri.parse('$url/books'),
+        headers: {'Accept': 'application/json'},
+      ).timeout(timeout);
+      
+      if (response.statusCode == 200) {
+        final responseData = json.decode(response.body);
+        
+        // Handle new API response structure with data and total
+        List<dynamic> data;
+        int total = 0;
+        
+        if (responseData is Map && responseData.containsKey('data')) {
+          data = responseData['data'];
+          total = responseData['total'] ?? data.length;
+        } else if (responseData is List) {
+          // Fallback for old API response format
+          data = responseData;
+          total = data.length;
+        } else {
+          throw Exception('Onverwachte API response structuur');
+        }
+        
+        final books = data.map((json) => Book.fromJson(json)).toList();
+        return BooksResponse(books: books, total: total);
       } else {
         throw Exception('Server antwoordde met status ${response.statusCode}');
       }

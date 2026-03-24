@@ -13,7 +13,7 @@ else
     echo "   ❌ Geen server gevonden op poort 8000"
     echo ""
     echo "   Start de server met:"
-    echo "   cd /Users/silkedelvaux/Herd/showcase"
+    echo "   cd /Users/silkedelvaux/Herd/Book-Elf-App-Laravel-Backend"
     echo "   ./start-server.sh"
     echo ""
     exit 1

@@ -85,7 +85,8 @@ class StatisticsScreen extends StatelessWidget {
     // Genre distribution
     final genreCount = <String, int>{};
     for (var book in books) {
-      genreCount[book.type] = (genreCount[book.type] ?? 0) + 1;
+      final bookType = book.type ?? 'onbekend';
+      genreCount[bookType] = (genreCount[bookType] ?? 0) + 1;
     }
     final sortedGenres = genreCount.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));

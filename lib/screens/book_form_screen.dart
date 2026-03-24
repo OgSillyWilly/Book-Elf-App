@@ -40,6 +40,7 @@ class _BookFormScreenState extends State<BookFormScreen> {
   
   String _selectedType = 'boek';
   String? _coverUrl;
+  XFile? _selectedImage; // Geselecteerde afbeelding voor nieuwe boeken
   bool _isRead = false;
   int _rating = 0;
   bool _hasSlipcase = false;
@@ -91,7 +92,7 @@ class _BookFormScreenState extends State<BookFormScreen> {
       _isbnController.text = widget.book!.isbn ?? '';
       // Ensure selected type is in the list, otherwise use default
       if (BookTypes.all.contains(widget.book!.type)) {
-        _selectedType = widget.book!.type;
+        _selectedType = widget.book!.type ?? 'boek';
       } else {
         _selectedType = 'boek'; // fallback to default
       }
@@ -238,13 +239,29 @@ class _BookFormScreenState extends State<BookFormScreen> {
       final ImagePicker picker = ImagePicker();
       final XFile? image = await picker.pickImage(
         source: ImageSource.camera,
-        maxWidth: 1024,
-        maxHeight: 1536,
-        imageQuality: 85,
+        maxWidth: 800,
+        maxHeight: 1200,
+        imageQuality: 70,
       );
 
       if (image != null) {
-        await _uploadCoverImage(image);
+        if (widget.book == null) {
+          // Voor nieuwe boeken: bewaar de afbeelding tijdelijk
+          setState(() {
+            _selectedImage = image;
+          });
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Afbeelding geselecteerd - zal worden geüpload na opslaan'),
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
+        } else {
+          // Voor bestaande boeken: upload direct
+          await _uploadCoverImage(image);
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -262,13 +279,29 @@ class _BookFormScreenState extends State<BookFormScreen> {
       final ImagePicker picker = ImagePicker();
       final XFile? image = await picker.pickImage(
         source: ImageSource.gallery,
-        maxWidth: 1024,
-        maxHeight: 1536,
-        imageQuality: 85,
+        maxWidth: 800,
+        maxHeight: 1200,
+        imageQuality: 70,
       );
 
       if (image != null) {
-        await _uploadCoverImage(image);
+        if (widget.book == null) {
+          // Voor nieuwe boeken: bewaar de afbeelding tijdelijk
+          setState(() {
+            _selectedImage = image;
+          });
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Afbeelding geselecteerd - zal worden geüpload na opslaan'),
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
+        } else {
+          // Voor bestaande boeken: upload direct
+          await _uploadCoverImage(image);
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -282,38 +315,25 @@ class _BookFormScreenState extends State<BookFormScreen> {
   }
 
   Future<void> _uploadCoverImage(XFile imageFile) async {
-    // Need to save book first if it's new
-    if (widget.book == null) {
-      if (mounted) {
-        showErrorDialog(
-          context,
-          'Sla eerst op',
-          'Sla het boek eerst op voordat je een cover toevoegt.',
-        );
-      }
-      return;
-    }
-
     setState(() => _isLoading = true);
 
     try {
-      String? coverUrl;
+      // Read bytes
+      final bytes = await imageFile.readAsBytes();
       
-      if (kIsWeb) {
-        // Web platform: use bytes
-        final bytes = await imageFile.readAsBytes();
-        coverUrl = await ImageUploadService.uploadBookCoverFromBytes(
-          widget.book!.id!,
-          bytes,
-          imageFile.name,
-        );
-      } else {
-        // Mobile/Desktop platform: use File
-        coverUrl = await ImageUploadService.uploadBookCover(
-          widget.book!.id!,
-          File(imageFile.path),
-        );
+      // Get filename - prefer name, fallback to path basename
+      String filename = imageFile.name;
+      if (!filename.contains('.')) {
+        // If name has no extension, try to get it from path
+        filename = imageFile.path.split('/').last;
       }
+      
+      // Upload using bytes for both web and mobile for consistency
+      final coverUrl = await ImageUploadService.uploadBookCoverFromBytes(
+        widget.book!.id!,
+        bytes,
+        filename,
+      );
 
       setState(() {
         _coverUrl = coverUrl;
@@ -434,7 +454,45 @@ class _BookFormScreenState extends State<BookFormScreen> {
       };
 
       if (widget.book == null) {
-        await _apiService.createBook(bookData);
+        final newBook = await _apiService.createBook(bookData);
+        
+        // Als er een afbeelding geselecteerd is, upload deze nu
+        if (_selectedImage != null && newBook.id != null) {
+          try {
+            setState(() => _isLoading = true);
+            
+            if (kIsWeb) {
+              final bytes = await _selectedImage!.readAsBytes();
+              await ImageUploadService.uploadBookCoverFromBytes(
+                newBook.id!,
+                bytes,
+                _selectedImage!.name,
+              );
+            } else {
+              await ImageUploadService.uploadBookCover(
+                newBook.id!,
+                File(_selectedImage!.path),
+              );
+            }
+            
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Boek en afbeelding opgeslagen')),
+              );
+            }
+          } catch (e) {
+            // Afbeelding upload gefaald, maar boek is wel opgeslagen
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Boek opgeslagen, maar afbeelding upload mislukt: $e'),
+                  backgroundColor: Colors.orange,
+                  duration: const Duration(seconds: 4),
+                ),
+              );
+            }
+          }
+        }
       } else {
         await _apiService.updateBook(widget.book!.id!, bookData);
       }
@@ -627,10 +685,44 @@ class _BookFormScreenState extends State<BookFormScreen> {
                   ),
                   const SizedBox(height: 12),
 
-                  // Photo upload buttons (only for existing books)
-                  if (widget.book != null) ...[
-                    // Warning for web users
-                    if (kIsWeb) ...[
+                  // Toon preview van geselecteerde afbeelding (voor nieuwe boeken)
+                  if (_selectedImage != null && widget.book == null) ...[
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.green.shade50,
+                        border: Border.all(color: Colors.green.shade200),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.check_circle, color: Colors.green.shade700, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Afbeelding geselecteerd: ${_selectedImage!.name}',
+                              style: TextStyle(fontSize: 12, color: Colors.green.shade900),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close, size: 18),
+                            onPressed: () {
+                              setState(() => _selectedImage = null);
+                            },
+                            color: Colors.green.shade700,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+
+                  // Photo upload buttons
+                  // Warning for web users
+                  if (kIsWeb) ...[
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
@@ -653,8 +745,8 @@ class _BookFormScreenState extends State<BookFormScreen> {
                         ),
                       ),
                       const SizedBox(height: 8),
-                    ],
-                    Row(
+                  ],
+                  Row(
                       children: [
                         if (!kIsWeb)
                           Expanded(
@@ -680,7 +772,7 @@ class _BookFormScreenState extends State<BookFormScreen> {
                         ),
                       ],
                     ),
-                    if (_coverUrl != null && _coverUrl!.contains('/storage/covers/')) ...[
+                  if (widget.book != null && _coverUrl != null && _coverUrl!.contains('/storage/covers/')) ...[
                       const SizedBox(height: 8),
                       TextButton.icon(
                         onPressed: _isLoading ? null : _deleteCover,
@@ -691,7 +783,6 @@ class _BookFormScreenState extends State<BookFormScreen> {
                         ),
                       ),
                     ],
-                  ],
                   const SizedBox(height: 16),
 
                   DropdownButtonFormField<String>(

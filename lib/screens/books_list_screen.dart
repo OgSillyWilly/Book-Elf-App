@@ -33,11 +33,13 @@ class _BooksListScreenState extends State<BooksListScreen> {
   final TextEditingController _searchController = TextEditingController();
   List<Book> _allBooks = [];
   List<Book> _filteredBooks = [];
+  int _totalBooks = 0;
   bool _isLoading = true;
   bool _isImporting = false;
   String? _error;
   String _readFilter = 'all'; // 'all', 'read', 'unread'
-  String? _typeFilter; // null = all types
+  String? _typeFilter; // null = all genres
+  String? _formatFilter; // null = all formats
   int? _yearFilter; // null = all years
   String? _cabinetFilter; // null = all cabinets
   String? _ratingFilter; // null/all = all ratings, '5', '4+', '3+', '2+', '1+', 'unrated'
@@ -65,10 +67,11 @@ class _BooksListScreenState extends State<BooksListScreen> {
     });
 
     try {
-      final books = await _apiService.getBooks();
+      final response = await _apiService.getBooksWithTotal();
       setState(() {
-        _allBooks = books;
-        _filteredBooks = books;
+        _allBooks = response.books;
+        _filteredBooks = response.books;
+        _totalBooks = response.total;
         _isLoading = false;
       });
     } catch (e) {
@@ -87,6 +90,7 @@ class _BooksListScreenState extends State<BooksListScreen> {
         searchQuery: _searchController.text,
         readFilter: _readFilter,
         typeFilter: _typeFilter,
+        formatFilter: _formatFilter,
         yearFilter: _yearFilter,
         cabinetFilter: _cabinetFilter,
         ratingFilter: _ratingFilter,
@@ -98,6 +102,8 @@ class _BooksListScreenState extends State<BooksListScreen> {
   }
   
   List<String> _getUniqueTypes() => BookFilter.getUniqueTypes(_allBooks);
+
+  List<String> _getUniqueFormats() => BookFilter.getUniqueFormats(_allBooks);
 
   List<int> _getUniqueYears() => BookFilter.getUniqueYears(_allBooks);
 
@@ -401,7 +407,7 @@ class _BooksListScreenState extends State<BooksListScreen> {
                       onChanged: (value) => _filterBooks(),
                     ),
                     const SizedBox(height: 16),
-                    // Compact filter dropdowns - Row 1
+                    // Row 1: Status | Genre
                     Row(
                       children: [
                         // Status dropdown
@@ -455,7 +461,7 @@ class _BooksListScreenState extends State<BooksListScreen> {
                       ],
                     ),
                     const SizedBox(height: 12),
-                    // Compact filter dropdowns - Row 2
+                    // Row 2: Jaar gelezen | Formaat
                     Row(
                       children: [
                         // Year filter dropdown
@@ -501,25 +507,25 @@ class _BooksListScreenState extends State<BooksListScreen> {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        // Cabinet filter dropdown
+                        // Format dropdown
                         Expanded(
                           child: DropdownButtonFormField<String?>(
-                            initialValue: _cabinetFilter,
+                            initialValue: _formatFilter,
                             decoration: const InputDecoration(
-                              labelText: 'Kast',
-                              prefixIcon: Icon(Icons.shelves, size: 20),
+                              labelText: 'Formaat',
+                              prefixIcon: Icon(Icons.book_outlined, size: 20),
                               contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                               isDense: true,
                             ),
                             isExpanded: true,
                             items: [
                               const DropdownMenuItem(value: null, child: Text('Alle', overflow: TextOverflow.ellipsis)),
-                              ..._getUniqueCabinets().map((cabinet) =>
-                                DropdownMenuItem(value: cabinet, child: Text(cabinet, overflow: TextOverflow.ellipsis)),
+                              ..._getUniqueFormats().map((format) =>
+                                DropdownMenuItem(value: format, child: Text(format, overflow: TextOverflow.ellipsis)),
                               ),
                             ],
                             onChanged: (value) {
-                              setState(() => _cabinetFilter = value);
+                              setState(() => _formatFilter = value);
                               _filterBooks();
                             },
                           ),
@@ -527,9 +533,10 @@ class _BooksListScreenState extends State<BooksListScreen> {
                       ],
                     ),
                     const SizedBox(height: 12),
-                    // Rating filter - Row 3
+                    // Row 3: Beoordeling | Kast
                     Row(
                       children: [
+                        // Rating filter
                         Expanded(
                           child: DropdownButtonFormField<String?>(
                             initialValue: _ratingFilter,
@@ -556,8 +563,29 @@ class _BooksListScreenState extends State<BooksListScreen> {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        // Empty space to match the 2-column layout
-                        const Expanded(child: SizedBox()),
+                        // Cabinet filter dropdown
+                        Expanded(
+                          child: DropdownButtonFormField<String?>(
+                            initialValue: _cabinetFilter,
+                            decoration: const InputDecoration(
+                              labelText: 'Kast',
+                              prefixIcon: Icon(Icons.shelves, size: 20),
+                              contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                              isDense: true,
+                            ),
+                            isExpanded: true,
+                            items: [
+                              const DropdownMenuItem(value: null, child: Text('Alle', overflow: TextOverflow.ellipsis)),
+                              ..._getUniqueCabinets().map((cabinet) =>
+                                DropdownMenuItem(value: cabinet, child: Text(cabinet, overflow: TextOverflow.ellipsis)),
+                              ),
+                            ],
+                            onChanged: (value) {
+                              setState(() => _cabinetFilter = value);
+                              _filterBooks();
+                            },
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 12),
@@ -597,6 +625,33 @@ class _BooksListScreenState extends State<BooksListScreen> {
             ),
           ),
           
+          // Results counter
+          if (!_isLoading && _error == null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '${_filteredBooks.length} ${_filteredBooks.length == 1 ? 'boek' : 'boeken'} gevonden',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: Theme.of(context).colorScheme.secondary,
+                    ),
+                  ),
+                  if (_filteredBooks.length != _totalBooks)
+                    Text(
+                      'van $_totalBooks totaal',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          
           // Books list
           Expanded(
             child: _isLoading
@@ -623,7 +678,7 @@ class _BooksListScreenState extends State<BooksListScreen> {
                         ? Center(
                             child: Text(
                               _searchController.text.isNotEmpty || _readFilter != 'all' || 
-                                  _typeFilter != null || _yearFilter != null || 
+                                  _typeFilter != null || _formatFilter != null || _yearFilter != null || 
                                   _cabinetFilter != null || _ratingFilter != null
                                   ? 'Geen boeken gevonden met deze filters'
                                   : 'Geen boeken gevonden.\nTap op + om een boek toe te voegen.',

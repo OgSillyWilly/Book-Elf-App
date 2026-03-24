@@ -18,10 +18,16 @@ class BookFilter {
     return true;
   }
 
-  /// Filter books by type
+  /// Filter books by type (genre)
   static bool matchesType(Book book, String? typeFilter) {
     if (typeFilter == null) return true;
     return book.type == typeFilter;
+  }
+
+  /// Filter books by format
+  static bool matchesFormat(Book book, String? formatFilter) {
+    if (formatFilter == null) return true;
+    return book.format == formatFilter;
   }
 
   /// Filter books by year (extracted from endDate)
@@ -72,6 +78,7 @@ class BookFilter {
     String searchQuery = '',
     String readFilter = 'all',
     String? typeFilter,
+    String? formatFilter,
     int? yearFilter,
     String? cabinetFilter,
     String? ratingFilter,
@@ -80,17 +87,33 @@ class BookFilter {
       return matchesSearch(book, searchQuery) &&
           matchesReadStatus(book, readFilter) &&
           matchesType(book, typeFilter) &&
+          matchesFormat(book, formatFilter) &&
           matchesYear(book, yearFilter) &&
           matchesCabinet(book, cabinetFilter) &&
           matchesRating(book, ratingFilter);
     }).toList();
   }
 
-  /// Get unique types from books
+  /// Get unique types (genres) from books
   static List<String> getUniqueTypes(List<Book> books) {
-    final types = books.map((book) => book.type).toSet().toList();
+    final types = books
+        .where((book) => book.type != null && book.type!.isNotEmpty)
+        .map((book) => book.type!)
+        .toSet()
+        .toList();
     types.sort();
     return types;
+  }
+
+  /// Get unique formats from books
+  static List<String> getUniqueFormats(List<Book> books) {
+    final formats = books
+        .where((book) => book.format != null && book.format!.isNotEmpty)
+        .map((book) => book.format!)
+        .toSet()
+        .toList();
+    formats.sort();
+    return formats;
   }
 
   /// Get unique years from books (from endDate)
@@ -120,7 +143,21 @@ class BookFilter {
         .map((book) => book.cabinet!)
         .toSet()
         .toList();
-    cabinets.sort();
+    
+    // Numerieke sortering: 1, 2, 3, ... 9, 10 (niet 1, 10, 2, ...)
+    cabinets.sort((a, b) {
+      final numA = int.tryParse(a);
+      final numB = int.tryParse(b);
+      
+      // Beiden zijn nummers? Sorteer numeriek
+      if (numA != null && numB != null) {
+        return numA.compareTo(numB);
+      }
+      
+      // Als één geen nummer is, sorteer alfabetisch
+      return a.compareTo(b);
+    });
+    
     return cabinets;
   }
 }

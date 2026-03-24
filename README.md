@@ -32,7 +32,7 @@ De app opent op: http://localhost:8080
 ### Backend Server
 Zorg dat de Laravel backend draait:
 ```bash
-cd ../showcase
+cd ../Book-Elf-App-Laravel-Backend
 php artisan serve --host=0.0.0.0 --port=8000
 ```
 
@@ -162,7 +162,7 @@ cd bookshelf_app
 curl http://127.0.0.1:8000/api/books
 
 # 3. Als server niet draait
-cd ../showcase
+cd ../Book-Elf-App-Laravel-Backend
 ./start-server.sh
 ```
 

@@ -3,7 +3,8 @@ class Book {
   final String title;
   final String author;
   final String? isbn;
-  final String type;
+  final String? type;
+  final String? format;
   final String? publisher;
   final String? publicationDate;
   final String? coverUrl;
@@ -23,7 +24,8 @@ class Book {
     required this.title,
     required this.author,
     this.isbn,
-    required this.type,
+    this.type,
+    this.format,
     this.publisher,
     this.publicationDate,
     this.coverUrl,
@@ -64,7 +66,8 @@ class Book {
       title: json['title']?.toString() ?? '',
       author: json['author']?.toString() ?? '',
       isbn: json['isbn']?.toString(),
-      type: json['type']?.toString() ?? 'boek',
+      type: json['type']?.toString(),
+      format: json['format']?.toString(),
       publisher: json['publisher']?.toString(),
       publicationDate: json['publication_date']?.toString(),
       coverUrl: rawCoverUrl is String ? rawCoverUrl : null,
@@ -87,6 +90,7 @@ class Book {
       'author': author,
       'isbn': isbn,
       'type': type,
+      'format': format,
       'publisher': publisher,
       'publication_date': publicationDate,
       'cover_url': coverUrl,

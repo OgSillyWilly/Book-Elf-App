@@ -183,7 +183,7 @@ class BookDetailScreen extends StatelessWidget {
             context,
             Icons.category,
             'Type',
-            book.type,
+            book.type ?? 'Onbekend',
           ),
           
           // ISBN

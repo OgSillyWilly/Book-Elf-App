@@ -14,7 +14,7 @@ if lsof -Pi :8000 -sTCP:LISTEN -t >/dev/null ; then
 fi
 
 # Start server in background
-cd /Users/silkedelvaux/Herd/showcase
+cd /Users/silkedelvaux/Herd/Book-Elf-App-Laravel-Backend
 
 echo "Starting server at http://127.0.0.1:8000"
 echo "API endpoint: http://127.0.0.1:8000/api"
@@ -26,7 +26,7 @@ echo "  - Stoppen: killall php"
 echo ""
 
 # Start in background with nohup
-nohup php artisan serve --host=0.0.0.0 --port=8000 > /tmp/laravel-server.log 2>&1 &
+nohup php -d upload_max_filesize=10M -d post_max_size=10M -d memory_limit=256M artisan serve --host=0.0.0.0 --port=8000 > /tmp/laravel-server.log 2>&1 &
 
 # Give it a moment to start
 sleep 2
