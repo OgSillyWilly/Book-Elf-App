@@ -70,10 +70,12 @@ class _BooksListScreenState extends State<BooksListScreen> {
       final response = await _apiService.getBooksWithTotal();
       setState(() {
         _allBooks = response.books;
-        _filteredBooks = response.books;
         _totalBooks = response.total;
         _isLoading = false;
       });
+      
+      // Reapply filters after loading books
+      _filterBooks();
     } catch (e) {
       setState(() {
         _error = e.toString();

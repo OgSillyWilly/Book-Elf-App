@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import '../models/book.dart';
+import '../services/api_service.dart';
 import '../widgets/rating_stars.dart';
 import 'book_form_screen.dart';
 
-class BookDetailScreen extends StatelessWidget {
+class BookDetailScreen extends StatefulWidget {
   final Book book;
   final VoidCallback? onBookUpdated;
   final VoidCallback? onBookDeleted;
@@ -16,11 +17,57 @@ class BookDetailScreen extends StatelessWidget {
   });
 
   @override
+  State<BookDetailScreen> createState() => _BookDetailScreenState();
+}
+
+class _BookDetailScreenState extends State<BookDetailScreen> {
+  late Book _currentBook;
+  final ApiService _apiService = ApiService();
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentBook = widget.book;
+  }
+
+  Future<void> _refreshBook() async {
+    if (_currentBook.id == null) return;
+    
+    setState(() => _isLoading = true);
+    try {
+      final updatedBook = await _apiService.getBook(_currentBook.id!);
+      setState(() {
+        _currentBook = updatedBook;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Fout bij herladen: $e')),
+        );
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Boek Details'),
         actions: [
+          if (_isLoading)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(16.0),
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            ),
           IconButton(
             icon: const Icon(Icons.edit),
             tooltip: 'Bewerk',
@@ -28,12 +75,12 @@ class BookDetailScreen extends StatelessWidget {
               final result = await Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => BookFormScreen(book: book),
+                  builder: (context) => BookFormScreen(book: _currentBook),
                 ),
               );
               if (result == true && context.mounted) {
-                onBookUpdated?.call();
-                Navigator.pop(context, true);
+                await _refreshBook();
+                widget.onBookUpdated?.call();
               }
             },
           ),
@@ -67,12 +114,12 @@ class BookDetailScreen extends StatelessWidget {
         children: [
           // Cover image
           Hero(
-            tag: 'book-cover-${book.id}',
+            tag: 'book-cover-${_currentBook.id}',
             child: ClipRRect(
               borderRadius: BorderRadius.circular(8),
-              child: book.coverUrl != null
+              child: _currentBook.coverUrl != null
                   ? Image.network(
-                      book.coverUrl!,
+                      _currentBook.coverUrl!,
                       width: 120,
                       height: 180,
                       fit: BoxFit.cover,
@@ -89,14 +136,14 @@ class BookDetailScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  book.title,
+                  _currentBook.title,
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  book.author,
+                  _currentBook.author,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
@@ -104,9 +151,9 @@ class BookDetailScreen extends StatelessWidget {
                 const SizedBox(height: 12),
                 
                 // Rating
-                if (book.isRead && book.rating != null && book.rating! > 0) ...[
+                if (_currentBook.isRead && _currentBook.rating != null && _currentBook.rating! > 0) ...[
                   RatingStars(
-                    rating: book.rating!,
+                    rating: _currentBook.rating!,
                     size: 24,
                   ),
                   const SizedBox(height: 8),
@@ -116,12 +163,12 @@ class BookDetailScreen extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: book.isRead
+                    color: _currentBook.isRead
                         ? Colors.green.withOpacity(0.2)
                         : Colors.orange.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: book.isRead ? Colors.green : Colors.orange,
+                      color: _currentBook.isRead ? Colors.green : Colors.orange,
                       width: 1,
                     ),
                   ),
@@ -129,15 +176,15 @@ class BookDetailScreen extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        book.isRead ? Icons.check_circle : Icons.schedule,
+                        _currentBook.isRead ? Icons.check_circle : Icons.schedule,
                         size: 16,
-                        color: book.isRead ? Colors.green : Colors.orange,
+                        color: _currentBook.isRead ? Colors.green : Colors.orange,
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        book.isRead ? 'Gelezen' : 'Ongelezen',
+                        _currentBook.isRead ? 'Gelezen' : 'Ongelezen',
                         style: TextStyle(
-                          color: book.isRead ? Colors.green : Colors.orange,
+                          color: _currentBook.isRead ? Colors.green : Colors.orange,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -183,40 +230,40 @@ class BookDetailScreen extends StatelessWidget {
             context,
             Icons.category,
             'Type',
-            book.type ?? 'Onbekend',
+            _currentBook.type ?? 'Onbekend',
           ),
           
           // ISBN
-          if (book.isbn != null && book.isbn!.isNotEmpty)
+          if (_currentBook.isbn != null && _currentBook.isbn!.isNotEmpty)
             _buildInfoRow(
               context,
               Icons.qr_code,
               'ISBN',
-              book.isbn!,
+              _currentBook.isbn!,
             ),
           
           // Publisher
-          if (book.publisher != null && book.publisher!.isNotEmpty)
+          if (_currentBook.publisher != null && _currentBook.publisher!.isNotEmpty)
             _buildInfoRow(
               context,
               Icons.business,
               'Uitgever',
-              book.publisher!,
+              _currentBook.publisher!,
             ),
           
           // Publication date
-          if (book.publicationDate != null && book.publicationDate!.isNotEmpty)
+          if (_currentBook.publicationDate != null && _currentBook.publicationDate!.isNotEmpty)
             _buildInfoRow(
               context,
               Icons.calendar_month,
               'Publicatiedatum',
-              _formatDate(book.publicationDate!),
+              _formatDate(_currentBook.publicationDate!),
             ),
           
           const Divider(height: 32),
           
           // Reading dates section
-          if (book.isRead) ...[
+          if (_currentBook.isRead) ...[
             Text(
               'Leesgeschiedenis',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
@@ -225,20 +272,20 @@ class BookDetailScreen extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             
-            if (book.startDate != null && book.startDate!.isNotEmpty)
+            if (_currentBook.startDate != null && _currentBook.startDate!.isNotEmpty)
               _buildInfoRow(
                 context,
                 Icons.play_circle_outline,
                 'Startdatum',
-                _formatDate(book.startDate!),
+                _formatDate(_currentBook.startDate!),
               ),
             
-            if (book.endDate != null && book.endDate!.isNotEmpty)
+            if (_currentBook.endDate != null && _currentBook.endDate!.isNotEmpty)
               _buildInfoRow(
                 context,
                 Icons.check_circle_outline,
                 'Einddatum',
-                _formatDate(book.endDate!),
+                _formatDate(_currentBook.endDate!),
               ),
             
             const Divider(height: 32),
@@ -257,18 +304,18 @@ class BookDetailScreen extends StatelessWidget {
             context,
             Icons.storage,
             'Dustjacket',
-            book.hasDustjacket ? 'Ja' : 'Nee',
+            _currentBook.hasDustjacket ? 'Ja' : 'Nee',
           ),
           
           _buildInfoRow(
             context,
             Icons.layers,
             'Slipcase',
-            book.hasSlipcase ? 'Ja' : 'Nee',
+            _currentBook.hasSlipcase ? 'Ja' : 'Nee',
           ),
           
           // Location section
-          if (book.cabinet != null || book.shelf != null || book.position != null) ...[
+          if (_currentBook.cabinet != null || _currentBook.shelf != null || _currentBook.position != null) ...[
             const Divider(height: 32),
             Text(
               'Locatie',
@@ -278,28 +325,28 @@ class BookDetailScreen extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             
-            if (book.cabinet != null)
+            if (_currentBook.cabinet != null)
               _buildInfoRow(
                 context,
                 Icons.shelves,
                 'Kast',
-                book.cabinet!,
+                _currentBook.cabinet!,
               ),
             
-            if (book.shelf != null)
+            if (_currentBook.shelf != null)
               _buildInfoRow(
                 context,
                 Icons.horizontal_rule,
                 'Plank',
-                book.shelf!,
+                _currentBook.shelf!,
               ),
             
-            if (book.position != null)
+            if (_currentBook.position != null)
               _buildInfoRow(
                 context,
                 Icons.pin_drop,
                 'Positie',
-                book.position.toString(),
+                _currentBook.position.toString(),
               ),
           ],
         ],

@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/book.dart';
+import '../models/series.dart';
+import '../models/reading_challenge.dart';
 import '../config/app_config.dart';
 
 class BooksResponse {
@@ -50,29 +52,40 @@ class ApiService {
   Future<List<Book>> getBooks() async {
     try {
       final url = await getBaseUrl();
-      final response = await http.get(
-        Uri.parse('$url/books'),
-        headers: {'Accept': 'application/json'},
-      ).timeout(timeout);
+      List<Book> allBooks = [];
+      int currentPage = 1;
+      int lastPage = 1;
       
-      if (response.statusCode == 200) {
-        final responseData = json.decode(response.body);
+      // Fetch all pages
+      do {
+        final response = await http.get(
+          Uri.parse('$url/books?page=$currentPage'),
+          headers: {'Accept': 'application/json'},
+        ).timeout(timeout);
         
-        // Handle new API response structure with data and total
-        List<dynamic> data;
-        if (responseData is Map && responseData.containsKey('data')) {
-          data = responseData['data'];
-        } else if (responseData is List) {
-          // Fallback for old API response format
-          data = responseData;
+        if (response.statusCode == 200) {
+          final responseData = json.decode(response.body);
+          
+          // Handle new API response structure with data and total
+          List<dynamic> data;
+          if (responseData is Map && responseData.containsKey('data')) {
+            data = responseData['data'];
+            lastPage = responseData['last_page'] ?? 1;
+          } else if (responseData is List) {
+            // Fallback for old API response format
+            data = responseData;
+          } else {
+            throw Exception('Onverwachte API response structuur');
+          }
+          
+          allBooks.addAll(data.map((json) => Book.fromJson(json)).toList());
+          currentPage++;
         } else {
-          throw Exception('Onverwachte API response structuur');
+          throw Exception('Server antwoordde met status ${response.statusCode}');
         }
-        
-        return data.map((json) => Book.fromJson(json)).toList();
-      } else {
-        throw Exception('Server antwoordde met status ${response.statusCode}');
-      }
+      } while (currentPage <= lastPage);
+      
+      return allBooks;
     } on TimeoutException {
       final url = await getBaseUrl();
       throw Exception('Verbinding timeout - controleer of de server draait op $url');
@@ -85,34 +98,44 @@ class ApiService {
   Future<BooksResponse> getBooksWithTotal() async {
     try {
       final url = await getBaseUrl();
-      final response = await http.get(
-        Uri.parse('$url/books'),
-        headers: {'Accept': 'application/json'},
-      ).timeout(timeout);
+      List<Book> allBooks = [];
+      int total = 0;
+      int currentPage = 1;
+      int lastPage = 1;
       
-      if (response.statusCode == 200) {
-        final responseData = json.decode(response.body);
+      // Fetch all pages
+      do {
+        final response = await http.get(
+          Uri.parse('$url/books?page=$currentPage'),
+          headers: {'Accept': 'application/json'},
+        ).timeout(timeout);
         
-        // Handle new API response structure with data and total
-        List<dynamic> data;
-        int total = 0;
-        
-        if (responseData is Map && responseData.containsKey('data')) {
-          data = responseData['data'];
-          total = responseData['total'] ?? data.length;
-        } else if (responseData is List) {
-          // Fallback for old API response format
-          data = responseData;
-          total = data.length;
+        if (response.statusCode == 200) {
+          final responseData = json.decode(response.body);
+          
+          // Handle new API response structure with data and total
+          List<dynamic> data;
+          
+          if (responseData is Map && responseData.containsKey('data')) {
+            data = responseData['data'];
+            total = responseData['total'] ?? data.length;
+            lastPage = responseData['last_page'] ?? 1;
+          } else if (responseData is List) {
+            // Fallback for old API response format
+            data = responseData;
+            total = data.length;
+          } else {
+            throw Exception('Onverwachte API response structuur');
+          }
+          
+          allBooks.addAll(data.map((json) => Book.fromJson(json)).toList());
+          currentPage++;
         } else {
-          throw Exception('Onverwachte API response structuur');
+          throw Exception('Server antwoordde met status ${response.statusCode}');
         }
-        
-        final books = data.map((json) => Book.fromJson(json)).toList();
-        return BooksResponse(books: books, total: total);
-      } else {
-        throw Exception('Server antwoordde met status ${response.statusCode}');
-      }
+      } while (currentPage <= lastPage);
+      
+      return BooksResponse(books: allBooks, total: total);
     } on TimeoutException {
       final url = await getBaseUrl();
       throw Exception('Verbinding timeout - controleer of de server draait op $url');
@@ -137,6 +160,24 @@ class ApiService {
         return Book.fromJson(json.decode(response.body));
       } else {
         throw Exception('Kon boek niet aanmaken: ${response.body}');
+      }
+    } on TimeoutException {
+      throw Exception('Verbinding timeout - controleer of de server draait');
+    }
+  }
+
+  Future<Book> getBook(int id) async {
+    try {
+      final url = await getBaseUrl();
+      final response = await http.get(
+        Uri.parse('$url/books/$id'),
+        headers: {'Accept': 'application/json'},
+      ).timeout(timeout);
+
+      if (response.statusCode == 200) {
+        return Book.fromJson(json.decode(response.body));
+      } else {
+        throw Exception('Kon boek niet ophalen: ${response.body}');
       }
     } on TimeoutException {
       throw Exception('Verbinding timeout - controleer of de server draait');
@@ -231,7 +272,20 @@ class ApiService {
       ).timeout(timeout);
       
       if (response.statusCode == 200) {
-        List<dynamic> data = json.decode(response.body);
+        final responseData = json.decode(response.body);
+        
+        // Handle new API response structure with pagination
+        List<dynamic> data;
+        if (responseData is Map && responseData.containsKey('data')) {
+          // Paginated response - extract data array
+          data = responseData['data'];
+        } else if (responseData is List) {
+          // Fallback for old API response format (simple array)
+          data = responseData;
+        } else {
+          throw Exception('Onverwachte API response structuur');
+        }
+        
         return data.map((json) => Book.fromJson(json)).toList();
       } else {
         throw Exception('Server antwoordde met status ${response.statusCode}');
@@ -263,6 +317,401 @@ class ApiService {
       throw Exception('Verbinding timeout - controleer of de server draait op $url');
     } catch (e) {
       throw Exception('Verbindingsfout: ${e.toString()}');
+    }
+  }
+
+  // ==================== SERIES API ====================
+  
+  Future<List<Series>> getSeries({String? search}) async {
+    try {
+      final url = await getBaseUrl();
+      var uri = '$url/series';
+      if (search != null && search.isNotEmpty) {
+        uri += '?search=$search';
+      }
+      
+      final response = await http.get(
+        Uri.parse(uri),
+        headers: {'Accept': 'application/json'},
+      ).timeout(timeout);
+      
+      if (response.statusCode == 200) {
+        final responseData = json.decode(response.body);
+        List<dynamic> data;
+        
+        if (responseData is Map && responseData.containsKey('data')) {
+          data = responseData['data'];
+        } else if (responseData is List) {
+          data = responseData;
+        } else {
+          throw Exception('Onverwachte API response structuur');
+        }
+        
+        return data.map((json) => Series.fromJson(json)).toList();
+      } else {
+        throw Exception('Server antwoordde met status ${response.statusCode}');
+      }
+    } on TimeoutException {
+      throw Exception('Verbinding timeout');
+    } catch (e) {
+      throw Exception('Verbindingsfout: ${e.toString()}');
+    }
+  }
+
+  Future<Map<String, dynamic>> getSeriesWithProgress(int id) async {
+    try {
+      final url = await getBaseUrl();
+      final response = await http.get(
+        Uri.parse('$url/series/$id'),
+        headers: {'Accept': 'application/json'},
+      ).timeout(timeout);
+      
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception('Server antwoordde met status ${response.statusCode}');
+      }
+    } on TimeoutException {
+      throw Exception('Verbinding timeout');
+    }
+  }
+
+  Future<Series> createSeries(Map<String, dynamic> seriesData) async {
+    try {
+      final url = await getBaseUrl();
+      final response = await http.post(
+        Uri.parse('$url/series'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: json.encode(seriesData),
+      ).timeout(timeout);
+
+      if (response.statusCode == 201) {
+        return Series.fromJson(json.decode(response.body));
+      } else {
+        throw Exception('Kon serie niet aanmaken: ${response.body}');
+      }
+    } on TimeoutException {
+      throw Exception('Verbinding timeout');
+    }
+  }
+
+  Future<Series> updateSeries(int id, Map<String, dynamic> seriesData) async {
+    try {
+      final url = await getBaseUrl();
+      final response = await http.put(
+        Uri.parse('$url/series/$id'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: json.encode(seriesData),
+      ).timeout(timeout);
+
+      if (response.statusCode == 200) {
+        return Series.fromJson(json.decode(response.body));
+      } else {
+        throw Exception('Kon serie niet bijwerken: ${response.body}');
+      }
+    } on TimeoutException {
+      throw Exception('Verbinding timeout');
+    }
+  }
+
+  Future<void> deleteSeries(int id) async {
+    try {
+      final url = await getBaseUrl();
+      final response = await http.delete(
+        Uri.parse('$url/series/$id'),
+        headers: {'Accept': 'application/json'},
+      ).timeout(timeout);
+      
+      if (response.statusCode != 204 && response.statusCode != 200) {
+        throw Exception('Kon serie niet verwijderen');
+      }
+    } on TimeoutException {
+      throw Exception('Verbinding timeout');
+    }
+  }
+
+  // ==================== READING CHALLENGES API ====================
+  
+  Future<List<ReadingChallenge>> getReadingChallenges() async {
+    try {
+      final url = await getBaseUrl();
+      final response = await http.get(
+        Uri.parse('$url/reading-challenges'),
+        headers: {'Accept': 'application/json'},
+      ).timeout(timeout);
+      
+      if (response.statusCode == 200) {
+        List<dynamic> data = json.decode(response.body);
+        return data.map((json) => ReadingChallenge.fromJson(json)).toList();
+      } else {
+        throw Exception('Server antwoordde met status ${response.statusCode}');
+      }
+    } on TimeoutException {
+      throw Exception('Verbinding timeout');
+    } catch (e) {
+      throw Exception('Verbindingsfout: ${e.toString()}');
+    }
+  }
+
+  Future<ReadingChallenge?> getActiveChallenge() async {
+    try {
+      final url = await getBaseUrl();
+      final response = await http.get(
+        Uri.parse('$url/reading-challenges/active'),
+        headers: {'Accept': 'application/json'},
+      ).timeout(timeout);
+      
+      if (response.statusCode == 200) {
+        return ReadingChallenge.fromJson(json.decode(response.body));
+      } else if (response.statusCode == 404) {
+        return null; // No active challenge
+      } else {
+        throw Exception('Server antwoordde met status ${response.statusCode}');
+      }
+    } on TimeoutException {
+      throw Exception('Verbinding timeout');
+    } catch (e) {
+      if (e.toString().contains('404')) return null;
+      throw Exception('Verbindingsfout: ${e.toString()}');
+    }
+  }
+
+  Future<Map<String, dynamic>> getChallengeWithDetails(int id) async {
+    try {
+      final url = await getBaseUrl();
+      final response = await http.get(
+        Uri.parse('$url/reading-challenges/$id'),
+        headers: {'Accept': 'application/json'},
+      ).timeout(timeout);
+      
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception('Server antwoordde met status ${response.statusCode}');
+      }
+    } on TimeoutException {
+      throw Exception('Verbinding timeout');
+    }
+  }
+
+  Future<Map<String, dynamic>> getChallengeSuggestions(int challengeId, {int limit = 10}) async {
+    try {
+      final url = await getBaseUrl();
+      final response = await http.get(
+        Uri.parse('$url/reading-challenges/$challengeId/suggestions?limit=$limit'),
+        headers: {'Accept': 'application/json'},
+      ).timeout(timeout);
+      
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception('Server antwoordde met status ${response.statusCode}');
+      }
+    } on TimeoutException {
+      throw Exception('Verbinding timeout');
+    }
+  }
+
+  Future<ReadingChallenge> createChallenge(Map<String, dynamic> challengeData) async {
+    try {
+      final url = await getBaseUrl();
+      final response = await http.post(
+        Uri.parse('$url/reading-challenges'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: json.encode(challengeData),
+      ).timeout(timeout);
+
+      if (response.statusCode == 201) {
+        return ReadingChallenge.fromJson(json.decode(response.body));
+      } else {
+        throw Exception('Kon challenge niet aanmaken: ${response.body}');
+      }
+    } on TimeoutException {
+      throw Exception('Verbinding timeout');
+    }
+  }
+
+  Future<ReadingChallenge> updateChallenge(int id, Map<String, dynamic> challengeData) async {
+    try {
+      final url = await getBaseUrl();
+      final response = await http.put(
+        Uri.parse('$url/reading-challenges/$id'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: json.encode(challengeData),
+      ).timeout(timeout);
+
+      if (response.statusCode == 200) {
+        return ReadingChallenge.fromJson(json.decode(response.body));
+      } else {
+        throw Exception('Kon challenge niet bijwerken: ${response.body}');
+      }
+    } on TimeoutException {
+      throw Exception('Verbinding timeout');
+    }
+  }
+
+  Future<void> deleteChallenge(int id) async {
+    try {
+      final url = await getBaseUrl();
+      final response = await http.delete(
+        Uri.parse('$url/reading-challenges/$id'),
+        headers: {'Accept': 'application/json'},
+      ).timeout(timeout);
+      
+      if (response.statusCode != 204 && response.statusCode != 200) {
+        throw Exception('Kon challenge niet verwijderen');
+      }
+    } on TimeoutException {
+      throw Exception('Verbinding timeout');
+    }
+  }
+
+  // ==================== STATISTICS API ====================
+  
+  Future<Map<String, dynamic>> getStatisticsOverview() async {
+    try {
+      final url = await getBaseUrl();
+      final response = await http.get(
+        Uri.parse('$url/statistics/overview'),
+        headers: {'Accept': 'application/json'},
+      ).timeout(timeout);
+      
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception('Server antwoordde met status ${response.statusCode}');
+      }
+    } on TimeoutException {
+      throw Exception('Verbinding timeout');
+    } catch (e) {
+      throw Exception('Verbindingsfout: ${e.toString()}');
+    }
+  }
+
+  Future<Map<String, dynamic>> getAuthorProgress(String author) async {
+    try {
+      final url = await getBaseUrl();
+      final response = await http.get(
+        Uri.parse('$url/statistics/author-progress?author=${Uri.encodeComponent(author)}'),
+        headers: {'Accept': 'application/json'},
+      ).timeout(timeout);
+      
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception('Server antwoordde met status ${response.statusCode}');
+      }
+    } on TimeoutException {
+      throw Exception('Verbinding timeout');
+    }
+  }
+
+  Future<Map<String, dynamic>> getReadingPatterns({int? year}) async {
+    try {
+      final url = await getBaseUrl();
+      var uri = '$url/statistics/reading-patterns';
+      if (year != null) {
+        uri += '?year=$year';
+      }
+      
+      final response = await http.get(
+        Uri.parse(uri),
+        headers: {'Accept': 'application/json'},
+      ).timeout(timeout);
+      
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception('Server antwoordde met status ${response.statusCode}');
+      }
+    } on TimeoutException {
+      throw Exception('Verbinding timeout');
+    }
+  }
+
+  Future<Map<String, dynamic>> getStatisticsByType() async {
+    try {
+      final url = await getBaseUrl();
+      final response = await http.get(
+        Uri.parse('$url/statistics/by-type'),
+        headers: {'Accept': 'application/json'},
+      ).timeout(timeout);
+      
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception('Server antwoordde met status ${response.statusCode}');
+      }
+    } on TimeoutException {
+      throw Exception('Verbinding timeout');
+    }
+  }
+
+  Future<List<Book>> getTopRatedBooks({int limit = 10}) async {
+    try {
+      final url = await getBaseUrl();
+      final response = await http.get(
+        Uri.parse('$url/statistics/top-rated?limit=$limit'),
+        headers: {'Accept': 'application/json'},
+      ).timeout(timeout);
+      
+      if (response.statusCode == 200) {
+        List<dynamic> data = json.decode(response.body);
+        return data.map((json) => Book.fromJson(json)).toList();
+      } else {
+        throw Exception('Server antwoordde met status ${response.statusCode}');
+      }
+    } on TimeoutException {
+      throw Exception('Verbinding timeout');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getYearlyHistory() async {
+    try {
+      final url = await getBaseUrl();
+      final response = await http.get(
+        Uri.parse('$url/statistics/yearly-history'),
+        headers: {'Accept': 'application/json'},
+      ).timeout(timeout);
+      
+      if (response.statusCode == 200) {
+        List<dynamic> data = json.decode(response.body);
+        return data.cast<Map<String, dynamic>>();
+      } else {
+        throw Exception('Server antwoordde met status ${response.statusCode}');
+      }
+    } on TimeoutException {
+      throw Exception('Verbinding timeout');
+    }
+  }
+
+  Future<Map<String, dynamic>> getSeriesProgress() async {
+    try {
+      final url = await getBaseUrl();
+      final response = await http.get(
+        Uri.parse('$url/statistics/series-progress'),
+        headers: {'Accept': 'application/json'},
+      ).timeout(timeout);
+      
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception('Server antwoordde met status ${response.statusCode}');
+      }
+    } on TimeoutException {
+      throw Exception('Verbinding timeout');
     }
   }
 }
