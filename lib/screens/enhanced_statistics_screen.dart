@@ -433,11 +433,11 @@ class _EnhancedStatisticsScreenState extends State<EnhancedStatisticsScreen> wit
                 borderRadius: BorderRadius.circular(4),
                 color: Colors.grey[300],
               ),
-              child: book.coverUrl != null
+              child: book.normalizedCoverUrl != null
                   ? ClipRRect(
                       borderRadius: BorderRadius.circular(4),
                       child: Image.network(
-                        book.coverUrl!,
+                        book.normalizedCoverUrl!,
                         fit: BoxFit.cover,
                         errorBuilder: (_, __, ___) => const Icon(Icons.book),
                       ),

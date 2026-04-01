@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../constants/book_types.dart';
 import '../models/book.dart';
 import '../services/api_service.dart';
@@ -328,6 +329,12 @@ class _BookFormScreenState extends State<BookFormScreen> {
         filename = imageFile.path.split('/').last;
       }
       
+      // Clear old image from cache if it exists
+      if (_coverUrl != null && !kIsWeb) {
+        await CachedNetworkImage.evictFromCache(_coverUrl!);
+        print('DEBUG: Cleared cache for old URL: $_coverUrl');
+      }
+      
       // Upload using bytes for both web and mobile for consistency
       final coverUrl = await ImageUploadService.uploadBookCoverFromBytes(
         widget.book!.id!,
@@ -335,15 +342,19 @@ class _BookFormScreenState extends State<BookFormScreen> {
         filename,
       );
 
+      print('DEBUG: Received cover URL: $coverUrl'); // Debug
+      
       setState(() {
         _coverUrl = coverUrl;
         _coverUrlController.text = coverUrl ?? '';
         _isLoading = false;
       });
 
+      print('DEBUG: Set _coverUrl to: $_coverUrl'); // Debug
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Cover succesvol geüpload')),
+          SnackBar(content: Text('Cover succesvol geüpload: ${coverUrl?.substring(0, 50)}...')),
         );
       }
     } catch (e) {
@@ -605,6 +616,7 @@ class _BookFormScreenState extends State<BookFormScreen> {
                     ClipRRect(
                       borderRadius: BorderRadius.circular(12),
                       child: CoverImage(
+                        key: ValueKey(_coverUrl), // Force rebuild when URL changes
                         imageUrl: _coverUrl!,
                         height: 180,
                         width: double.infinity,

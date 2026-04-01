@@ -26,6 +26,7 @@ class BookGridItem extends StatelessWidget {
       child: Card(
         clipBehavior: Clip.antiAlias,
         elevation: isSelected ? 4 : 1,
+        margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
           side: isSelected
@@ -37,13 +38,12 @@ class BookGridItem extends StatelessWidget {
           children: [
             // Cover Image (expanded to fill available space)
             Expanded(
-              flex: 3,
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  if (book.coverUrl != null && book.coverUrl!.isNotEmpty)
+                  if (book.normalizedCoverUrl != null && book.normalizedCoverUrl!.isNotEmpty)
                     CoverImage(
-                      imageUrl: book.coverUrl!,
+                      imageUrl: book.normalizedCoverUrl!,
                       fit: BoxFit.cover,
                     )
                   else
@@ -98,44 +98,42 @@ class BookGridItem extends StatelessWidget {
                 ],
               ),
             ),
-            // Book info
-            Expanded(
-              flex: 2,
-              child: Padding(
-                padding: const EdgeInsets.all(6),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      book.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
+            // Book info - Fixed height instead of flexible
+            Container(
+              padding: const EdgeInsets.all(6),
+              color: Theme.of(context).colorScheme.surface,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    book.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    book.author,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  if (book.isRead && book.rating != null && book.rating! > 0) ...[
                     const SizedBox(height: 2),
-                    Text(
-                      book.author,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
+                    RatingStars(
+                      rating: book.rating!,
+                      size: 10,
                     ),
-                    if (book.isRead && book.rating != null && book.rating! > 0) ...[
-                      const SizedBox(height: 2),
-                      RatingStars(
-                        rating: book.rating!,
-                        size: 10,
-                      ),
-                    ],
                   ],
-                ),
+                ],
               ),
             ),
           ],

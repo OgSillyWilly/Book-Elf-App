@@ -117,9 +117,9 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
             tag: 'book-cover-${_currentBook.id}',
             child: ClipRRect(
               borderRadius: BorderRadius.circular(8),
-              child: _currentBook.coverUrl != null
+              child: _currentBook.normalizedCoverUrl != null
                   ? Image.network(
-                      _currentBook.coverUrl!,
+                      _currentBook.normalizedCoverUrl!,
                       width: 120,
                       height: 180,
                       fit: BoxFit.cover,

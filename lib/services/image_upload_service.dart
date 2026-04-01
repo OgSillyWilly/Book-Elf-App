@@ -4,10 +4,10 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'dart:convert';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../config/app_config.dart';
 
 class ImageUploadService {
-  static String get _baseUrl => dotenv.env['API_URL'] ?? 'http://127.0.0.1:8000/api';
+  static String get _baseUrl => AppConfig.apiBaseUrl;
 
   // Determine mime type from filename
   static String _getMimeType(String filename) {
@@ -58,12 +58,9 @@ class ImageUploadService {
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
         
-        // Construeer de volledige URL
-        final coverPath = responseData['cover_url'] as String;
-        final baseApiUrl = Uri.parse(_baseUrl);
-        final fullUrl = '${baseApiUrl.scheme}://${baseApiUrl.host}:${baseApiUrl.port}$coverPath';
-        
-        return fullUrl;
+        // Return the cover URL from response (backend now returns full URL)
+        final coverUrl = responseData['cover_url'] as String;
+        return coverUrl;
       } else {
         throw Exception('Upload failed with status ${response.statusCode}: ${response.body}');
       }
@@ -98,12 +95,9 @@ class ImageUploadService {
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
         
-        // Construeer de volledige URL
-        final coverPath = responseData['cover_url'] as String;
-        final baseApiUrl = Uri.parse(_baseUrl);
-        final fullUrl = '${baseApiUrl.scheme}://${baseApiUrl.host}:${baseApiUrl.port}$coverPath';
-        
-        return fullUrl;
+        // Return the cover URL from response (backend now returns full URL)
+        final coverUrl = responseData['cover_url'] as String;
+        return coverUrl;
       } else {
         throw Exception('Upload failed with status ${response.statusCode}: ${response.body}');
       }

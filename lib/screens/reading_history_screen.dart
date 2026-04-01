@@ -182,11 +182,11 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
         return Card(
           margin: const EdgeInsets.only(bottom: 12),
           child: ListTile(
-            leading: book.coverUrl != null
+            leading: book.normalizedCoverUrl != null
                 ? ClipRRect(
                     borderRadius: BorderRadius.circular(4),
                     child: CoverImage(
-                      imageUrl: book.coverUrl!,
+                      imageUrl: book.normalizedCoverUrl!,
                       width: 40,
                       height: 60,
                       fit: BoxFit.cover,

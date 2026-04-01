@@ -1,3 +1,5 @@
+import '../utils/url_utils.dart';
+
 class Book {
   final int? id;
   final String title;
@@ -18,6 +20,10 @@ class Book {
   final String? endDate;
   final int? yearRead;
   final int? rating; // 0-5 stars
+
+  /// Get the cover URL normalized for the current platform
+  /// Converts relative URLs to absolute URLs using the appropriate base URL
+  String? get normalizedCoverUrl => normalizeImageUrl(coverUrl);
 
   Book({
     this.id,
@@ -48,7 +54,12 @@ class Book {
     int? parseIntSafely(dynamic value) {
       if (value == null) return null;
       if (value is int) return value;
-      if (value is String) return int.tryParse(value);
+      if (value is String) {
+        // Try to parse as double first, then convert to int (handles "3.0" format)
+        final doubleValue = double.tryParse(value);
+        return doubleValue?.toInt();
+      }
+      if (value is double) return value.toInt();
       return null;
     }
 

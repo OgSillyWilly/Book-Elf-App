@@ -568,11 +568,11 @@ class _ChallengeSuggestionsWidgetState extends State<_ChallengeSuggestionsWidget
               return Card(
                 margin: const EdgeInsets.only(bottom: 8),
                 child: ListTile(
-                  leading: book.coverUrl != null
+                  leading: book.normalizedCoverUrl != null
                       ? ClipRRect(
                           borderRadius: BorderRadius.circular(4),
                           child: Image.network(
-                            book.coverUrl!,
+                            book.normalizedCoverUrl!,
                             width: 40,
                             height: 60,
                             fit: BoxFit.cover,
@@ -914,11 +914,11 @@ class _ChallengeDetailScreenState extends State<ChallengeDetailScreen> {
                               return Card(
                                 margin: const EdgeInsets.only(bottom: 8),
                                 child: ListTile(
-                                  leading: book.coverUrl != null
+                                  leading: book.normalizedCoverUrl != null
                                       ? ClipRRect(
                                           borderRadius: BorderRadius.circular(4),
                                           child: Image.network(
-                                            book.coverUrl!,
+                                            book.normalizedCoverUrl!,
                                             width: 40,
                                             height: 60,
                                             fit: BoxFit.cover,

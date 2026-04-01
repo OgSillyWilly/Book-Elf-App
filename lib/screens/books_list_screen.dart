@@ -47,6 +47,7 @@ class _BooksListScreenState extends State<BooksListScreen> {
   bool _isSelectionMode = false;
   final Set<int> _selectedBookIds = {};
   String _viewMode = 'list'; // 'list' or 'grid'
+  bool _showFilters = false; // Voor collapse/expand van filters
 
   @override
   void initState() {
@@ -110,6 +111,18 @@ class _BooksListScreenState extends State<BooksListScreen> {
   List<int> _getUniqueYears() => BookFilter.getUniqueYears(_allBooks);
 
   List<String> _getUniqueCabinets() => BookFilter.getUniqueCabinets(_allBooks);
+
+  int _getActiveFiltersCount() {
+    int count = 0;
+    if (_readFilter != 'all') count++;
+    if (_typeFilter != null) count++;
+    if (_formatFilter != null) count++;
+    if (_yearFilter != null) count++;
+    if (_cabinetFilter != null) count++;
+    if (_ratingFilter != null) count++;
+    if (_sortBy != 'none') count++;
+    return count;
+  }
 
   Future<void> _deleteBook(int id) async {
     final confirm = await showDialog<bool>(
@@ -399,227 +412,325 @@ class _BooksListScreenState extends State<BooksListScreen> {
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-                    // Search bar
+                    // Search bar - Altijd zichtbaar
                     TextField(
                       controller: _searchController,
                       decoration: const InputDecoration(
                         labelText: 'Zoek op titel of auteur',
                         prefixIcon: Icon(Icons.search),
+                        border: OutlineInputBorder(),
                       ),
                       onChanged: (value) => _filterBooks(),
                     ),
-                    const SizedBox(height: 16),
-                    // Row 1: Status | Genre
-                    Row(
-                      children: [
-                        // Status dropdown
-                        Expanded(
-                          child: DropdownButtonFormField<String>(
-                            initialValue: _readFilter,
-                            decoration: const InputDecoration(
-                              labelText: 'Status',
-                              prefixIcon: Icon(Icons.check_circle_outline, size: 20),
-                              contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                              isDense: true,
-                            ),
-                            isExpanded: true,
-                            items: const [
-                              DropdownMenuItem(value: 'all', child: Text('Alle', overflow: TextOverflow.ellipsis)),
-                              DropdownMenuItem(value: 'read', child: Text('Gelezen', overflow: TextOverflow.ellipsis)),
-                              DropdownMenuItem(value: 'unread', child: Text('Ongelezen', overflow: TextOverflow.ellipsis)),
-                            ],
-                            onChanged: (value) {
-                              if (value != null) {
-                                setState(() => _readFilter = value);
-                                _filterBooks();
-                              }
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        // Genre dropdown
-                        Expanded(
-                          child: DropdownButtonFormField<String?>(
-                            initialValue: _typeFilter,
-                            decoration: const InputDecoration(
-                              labelText: 'Genre',
-                              prefixIcon: Icon(Icons.category_outlined, size: 20),
-                              contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                              isDense: true,
-                            ),
-                            isExpanded: true,
-                            items: [
-                              const DropdownMenuItem(value: null, child: Text('Alle', overflow: TextOverflow.ellipsis)),
-                              ..._getUniqueTypes().map((type) =>
-                                DropdownMenuItem(value: type, child: Text(type, overflow: TextOverflow.ellipsis)),
-                              ),
-                            ],
-                            onChanged: (value) {
-                              setState(() => _typeFilter = value);
-                              _filterBooks();
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
                     const SizedBox(height: 12),
-                    // Row 2: Jaar gelezen | Formaat
-                    Row(
-                      children: [
-                        // Year filter dropdown
-                        Expanded(
-                          child: DropdownButtonFormField<int?>(
-                            initialValue: _yearFilter,
-                            decoration: const InputDecoration(
-                              labelText: 'Jaar gelezen',
-                              prefixIcon: Icon(Icons.calendar_today, size: 20),
-                              contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                              isDense: true,
+                    // Mooie filter toggle button
+                    InkWell(
+                      onTap: () {
+                        setState(() {
+                          _showFilters = !_showFilters;
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: _showFilters 
+                            ? Theme.of(context).colorScheme.primaryContainer
+                            : Theme.of(context).colorScheme.surfaceVariant,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: _showFilters 
+                              ? Theme.of(context).colorScheme.primary
+                              : Theme.of(context).colorScheme.outline.withOpacity(0.3),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.tune,
+                              color: _showFilters 
+                                ? Theme.of(context).colorScheme.onPrimaryContainer
+                                : Theme.of(context).colorScheme.onSurfaceVariant,
+                              size: 20,
                             ),
-                            isExpanded: true,
-                            items: [
-                              const DropdownMenuItem(value: null, child: Text('Alle', overflow: TextOverflow.ellipsis)),
-                              ..._getUniqueYears().map((year) =>
-                                DropdownMenuItem(value: year, child: Text(year.toString(), overflow: TextOverflow.ellipsis)),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Filters',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: _showFilters 
+                                  ? Theme.of(context).colorScheme.onPrimaryContainer
+                                  : Theme.of(context).colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                            if (_getActiveFiltersCount() > 0) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  '${_getActiveFiltersCount()}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: Theme.of(context).colorScheme.onPrimary,
+                                  ),
+                                ),
                               ),
                             ],
-                            onChanged: (value) {
-                              setState(() => _yearFilter = value);
-                              _filterBooks();
-                              
-                              // Toon dialoog als er geen boeken zijn voor het geselecteerde jaar
-                              if (value != null && _filteredBooks.isEmpty) {
-                                Future.delayed(Duration.zero, () {
-                                  showDialog(
-                                    context: context,
-                                    builder: (context) => AlertDialog(
-                                      title: const Text('Geen boeken'),
-                                      content: Text('Geen boeken gelezen in $value'),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () => Navigator.pop(context),
-                                          child: const Text('OK'),
+                            const Spacer(),
+                            AnimatedRotation(
+                              turns: _showFilters ? 0.5 : 0,
+                              duration: const Duration(milliseconds: 300),
+                              child: Icon(
+                                Icons.keyboard_arrow_down,
+                                color: _showFilters 
+                                  ? Theme.of(context).colorScheme.onPrimaryContainer
+                                  : Theme.of(context).colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    // Uitklapbare filters met animatie
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeInOut,
+                      child: _showFilters
+                        ? Padding(
+                            padding: const EdgeInsets.only(top: 16),
+                            child: Column(
+                              children: [
+                                // Row 1: Status | Genre
+                                Row(
+                                  children: [
+                                    // Status dropdown
+                                    Expanded(
+                                      child: DropdownButtonFormField<String>(
+                                        value: _readFilter,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Status',
+                                          prefixIcon: Icon(Icons.check_circle_outline, size: 20),
+                                          contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                          isDense: true,
+                                          border: OutlineInputBorder(),
                                         ),
-                                      ],
+                                        isExpanded: true,
+                                        items: const [
+                                          DropdownMenuItem(value: 'all', child: Text('Alle', overflow: TextOverflow.ellipsis)),
+                                          DropdownMenuItem(value: 'read', child: Text('Gelezen', overflow: TextOverflow.ellipsis)),
+                                          DropdownMenuItem(value: 'unread', child: Text('Ongelezen', overflow: TextOverflow.ellipsis)),
+                                        ],
+                                        onChanged: (value) {
+                                          if (value != null) {
+                                            setState(() => _readFilter = value);
+                                            _filterBooks();
+                                          }
+                                        },
+                                      ),
                                     ),
-                                  );
-                                });
-                              }
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        // Format dropdown
-                        Expanded(
-                          child: DropdownButtonFormField<String?>(
-                            initialValue: _formatFilter,
-                            decoration: const InputDecoration(
-                              labelText: 'Formaat',
-                              prefixIcon: Icon(Icons.book_outlined, size: 20),
-                              contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                              isDense: true,
+                                    const SizedBox(width: 8),
+                                    // Genre dropdown
+                                    Expanded(
+                                      child: DropdownButtonFormField<String?>(
+                                        value: _typeFilter,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Genre',
+                                          prefixIcon: Icon(Icons.category_outlined, size: 20),
+                                          contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                          isDense: true,
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        isExpanded: true,
+                                        items: [
+                                          const DropdownMenuItem(value: null, child: Text('Alle', overflow: TextOverflow.ellipsis)),
+                                          ..._getUniqueTypes().map((type) =>
+                                            DropdownMenuItem(value: type, child: Text(type, overflow: TextOverflow.ellipsis)),
+                                          ),
+                                        ],
+                                        onChanged: (value) {
+                                          setState(() => _typeFilter = value);
+                                          _filterBooks();
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                // Row 2: Jaar gelezen | Formaat
+                                Row(
+                                  children: [
+                                    // Year filter dropdown
+                                    Expanded(
+                                      child: DropdownButtonFormField<int?>(
+                                        value: _yearFilter,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Jaar gelezen',
+                                          prefixIcon: Icon(Icons.calendar_today, size: 20),
+                                          contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                          isDense: true,
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        isExpanded: true,
+                                        items: [
+                                          const DropdownMenuItem(value: null, child: Text('Alle', overflow: TextOverflow.ellipsis)),
+                                          ..._getUniqueYears().map((year) =>
+                                            DropdownMenuItem(value: year, child: Text(year.toString(), overflow: TextOverflow.ellipsis)),
+                                          ),
+                                        ],
+                                        onChanged: (value) {
+                                          setState(() => _yearFilter = value);
+                                          _filterBooks();
+                                          
+                                          // Toon dialoog als er geen boeken zijn voor het geselecteerde jaar
+                                          if (value != null && _filteredBooks.isEmpty) {
+                                            Future.delayed(Duration.zero, () {
+                                              showDialog(
+                                                context: context,
+                                                builder: (context) => AlertDialog(
+                                                  title: const Text('Geen boeken'),
+                                                  content: Text('Geen boeken gelezen in $value'),
+                                                  actions: [
+                                                    TextButton(
+                                                      onPressed: () => Navigator.pop(context),
+                                                      child: const Text('OK'),
+                                                    ),
+                                                  ],
+                                                ),
+                                              );
+                                            });
+                                          }
+                                        },
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    // Format dropdown
+                                    Expanded(
+                                      child: DropdownButtonFormField<String?>(
+                                        value: _formatFilter,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Formaat',
+                                          prefixIcon: Icon(Icons.book_outlined, size: 20),
+                                          contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                          isDense: true,
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        isExpanded: true,
+                                        items: [
+                                          const DropdownMenuItem(value: null, child: Text('Alle', overflow: TextOverflow.ellipsis)),
+                                          ..._getUniqueFormats().map((format) =>
+                                            DropdownMenuItem(value: format, child: Text(format, overflow: TextOverflow.ellipsis)),
+                                          ),
+                                        ],
+                                        onChanged: (value) {
+                                          setState(() => _formatFilter = value);
+                                          _filterBooks();
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                // Row 3: Beoordeling | Kast
+                                Row(
+                                  children: [
+                                    // Rating filter
+                                    Expanded(
+                                      child: DropdownButtonFormField<String?>(
+                                        value: _ratingFilter,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Beoordeling',
+                                          prefixIcon: Icon(Icons.star_outline, size: 20),
+                                          contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                          isDense: true,
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        isExpanded: true,
+                                        items: const [
+                                          DropdownMenuItem(value: null, child: Text('Alle', overflow: TextOverflow.ellipsis)),
+                                          DropdownMenuItem(value: '5', child: Text('★★★★★ (5)', overflow: TextOverflow.ellipsis)),
+                                          DropdownMenuItem(value: '4', child: Text('★★★★☆ (4)', overflow: TextOverflow.ellipsis)),
+                                          DropdownMenuItem(value: '3', child: Text('★★★☆☆ (3)', overflow: TextOverflow.ellipsis)),
+                                          DropdownMenuItem(value: '2', child: Text('★★☆☆☆ (2)', overflow: TextOverflow.ellipsis)),
+                                          DropdownMenuItem(value: '1', child: Text('★☆☆☆☆ (1)', overflow: TextOverflow.ellipsis)),
+                                          DropdownMenuItem(value: 'unrated', child: Text('Onbeoordeeld', overflow: TextOverflow.ellipsis)),
+                                        ],
+                                        onChanged: (value) {
+                                          setState(() => _ratingFilter = value);
+                                          _filterBooks();
+                                        },
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    // Cabinet filter dropdown
+                                    Expanded(
+                                      child: DropdownButtonFormField<String?>(
+                                        value: _cabinetFilter,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Kast',
+                                          prefixIcon: Icon(Icons.shelves, size: 20),
+                                          contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                          isDense: true,
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        isExpanded: true,
+                                        items: [
+                                          const DropdownMenuItem(value: null, child: Text('Alle', overflow: TextOverflow.ellipsis)),
+                                          ..._getUniqueCabinets().map((cabinet) =>
+                                            DropdownMenuItem(value: cabinet, child: Text(cabinet, overflow: TextOverflow.ellipsis)),
+                                          ),
+                                        ],
+                                        onChanged: (value) {
+                                          setState(() => _cabinetFilter = value);
+                                          _filterBooks();
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                // Compact sort dropdown - Row 4
+                                Row(
+                                  children: [
+                                    // Sort dropdown
+                                    Expanded(
+                                      child: DropdownButtonFormField<String>(
+                                        value: _sortBy,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Sorteer',
+                                          prefixIcon: Icon(Icons.sort, size: 20),
+                                          contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                          isDense: true,
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        isExpanded: true,
+                                        items: const [
+                                          DropdownMenuItem(value: 'none', child: Text('Standaard', overflow: TextOverflow.ellipsis)),
+                                          DropdownMenuItem(value: 'title', child: Text('Titel', overflow: TextOverflow.ellipsis)),
+                                          DropdownMenuItem(value: 'author', child: Text('Auteur', overflow: TextOverflow.ellipsis)),
+                                          DropdownMenuItem(value: 'cabinet', child: Text('Kast', overflow: TextOverflow.ellipsis)),
+                                        ],
+                                        onChanged: (value) {
+                                          if (value != null) {
+                                            setState(() => _sortBy = value);
+                                            _filterBooks();
+                                          }
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
-                            isExpanded: true,
-                            items: [
-                              const DropdownMenuItem(value: null, child: Text('Alle', overflow: TextOverflow.ellipsis)),
-                              ..._getUniqueFormats().map((format) =>
-                                DropdownMenuItem(value: format, child: Text(format, overflow: TextOverflow.ellipsis)),
-                              ),
-                            ],
-                            onChanged: (value) {
-                              setState(() => _formatFilter = value);
-                              _filterBooks();
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    // Row 3: Beoordeling | Kast
-                    Row(
-                      children: [
-                        // Rating filter
-                        Expanded(
-                          child: DropdownButtonFormField<String?>(
-                            initialValue: _ratingFilter,
-                            decoration: const InputDecoration(
-                              labelText: 'Beoordeling',
-                              prefixIcon: Icon(Icons.star_outline, size: 20),
-                              contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                              isDense: true,
-                            ),
-                            isExpanded: true,
-                            items: const [
-                              DropdownMenuItem(value: null, child: Text('Alle', overflow: TextOverflow.ellipsis)),
-                              DropdownMenuItem(value: '5', child: Text('★★★★★ (5)', overflow: TextOverflow.ellipsis)),
-                              DropdownMenuItem(value: '4', child: Text('★★★★☆ (4)', overflow: TextOverflow.ellipsis)),
-                              DropdownMenuItem(value: '3', child: Text('★★★☆☆ (3)', overflow: TextOverflow.ellipsis)),
-                              DropdownMenuItem(value: '2', child: Text('★★☆☆☆ (2)', overflow: TextOverflow.ellipsis)),
-                              DropdownMenuItem(value: '1', child: Text('★☆☆☆☆ (1)', overflow: TextOverflow.ellipsis)),
-                              DropdownMenuItem(value: 'unrated', child: Text('Onbeoordeeld', overflow: TextOverflow.ellipsis)),
-                            ],
-                            onChanged: (value) {
-                              setState(() => _ratingFilter = value);
-                              _filterBooks();
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        // Cabinet filter dropdown
-                        Expanded(
-                          child: DropdownButtonFormField<String?>(
-                            initialValue: _cabinetFilter,
-                            decoration: const InputDecoration(
-                              labelText: 'Kast',
-                              prefixIcon: Icon(Icons.shelves, size: 20),
-                              contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                              isDense: true,
-                            ),
-                            isExpanded: true,
-                            items: [
-                              const DropdownMenuItem(value: null, child: Text('Alle', overflow: TextOverflow.ellipsis)),
-                              ..._getUniqueCabinets().map((cabinet) =>
-                                DropdownMenuItem(value: cabinet, child: Text(cabinet, overflow: TextOverflow.ellipsis)),
-                              ),
-                            ],
-                            onChanged: (value) {
-                              setState(() => _cabinetFilter = value);
-                              _filterBooks();
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    // Compact sort dropdown - Row 4
-                    Row(
-                      children: [
-                        // Sort dropdown
-                        Expanded(
-                          child: DropdownButtonFormField<String>(
-                            initialValue: _sortBy,
-                            decoration: const InputDecoration(
-                              labelText: 'Sorteer',
-                              prefixIcon: Icon(Icons.sort, size: 20),
-                              contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                              isDense: true,
-                            ),
-                            isExpanded: true,
-                            items: const [
-                              DropdownMenuItem(value: 'none', child: Text('Standaard', overflow: TextOverflow.ellipsis)),
-                              DropdownMenuItem(value: 'title', child: Text('Titel', overflow: TextOverflow.ellipsis)),
-                              DropdownMenuItem(value: 'author', child: Text('Auteur', overflow: TextOverflow.ellipsis)),
-                              DropdownMenuItem(value: 'cabinet', child: Text('Kast', overflow: TextOverflow.ellipsis)),
-                            ],
-                            onChanged: (value) {
-                              if (value != null) {
-                                setState(() => _sortBy = value);
-                                _filterBooks();
-                              }
-                            },
-                          ),
-                        ),
-                      ],
+                          )
+                        : const SizedBox.shrink(),
                     ),
                   ],
                 ),
@@ -750,11 +861,11 @@ class _BooksListScreenState extends State<BooksListScreen> {
                                                     _toggleBookSelection(book.id!);
                                                   },
                                                 )
-                                              : book.coverUrl != null && book.coverUrl!.isNotEmpty
+                                              : book.normalizedCoverUrl != null && book.normalizedCoverUrl!.isNotEmpty
                                               ? ClipRRect(
                                                   borderRadius: BorderRadius.circular(10),
                                                   child: CoverImage(
-                                                    imageUrl: book.coverUrl!,
+                                                    imageUrl: book.normalizedCoverUrl!,
                                                     width: 48,
                                                     height: 64,
                                                     fit: BoxFit.cover,

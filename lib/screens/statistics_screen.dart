@@ -85,7 +85,11 @@ class StatisticsScreen extends StatelessWidget {
     // Genre distribution
     final genreCount = <String, int>{};
     for (var book in books) {
-      final bookType = book.type ?? 'onbekend';
+      // Normalize genre to title case (first letter uppercase)
+      var bookType = book.type ?? 'onbekend';
+      if (bookType.isNotEmpty) {
+        bookType = bookType[0].toUpperCase() + bookType.substring(1).toLowerCase();
+      }
       genreCount[bookType] = (genreCount[bookType] ?? 0) + 1;
     }
     final sortedGenres = genreCount.entries.toList()
@@ -295,11 +299,11 @@ class StatisticsScreen extends StatelessWidget {
             else
               ...topRated.map((book) => ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: book.coverUrl != null
+                    leading: book.normalizedCoverUrl != null
                         ? ClipRRect(
                             borderRadius: BorderRadius.circular(4),
                             child: Image.network(
-                              book.coverUrl!,
+                              book.normalizedCoverUrl!,
                               width: 40,
                               height: 60,
                               fit: BoxFit.cover,

@@ -21,7 +21,17 @@ class BookFilter {
   /// Filter books by type (genre)
   static bool matchesType(Book book, String? typeFilter) {
     if (typeFilter == null) return true;
-    return book.type == typeFilter;
+    if (book.type == null) return false;
+    
+    // Normalize both to title case for case-insensitive comparison
+    final normalizedBookType = book.type!.isNotEmpty 
+        ? book.type![0].toUpperCase() + book.type!.substring(1).toLowerCase()
+        : '';
+    final normalizedFilter = typeFilter.isNotEmpty
+        ? typeFilter[0].toUpperCase() + typeFilter.substring(1).toLowerCase()
+        : '';
+    
+    return normalizedBookType == normalizedFilter;
   }
 
   /// Filter books by format
@@ -96,9 +106,13 @@ class BookFilter {
 
   /// Get unique types (genres) from books
   static List<String> getUniqueTypes(List<Book> books) {
+    // Normalize types to title case to avoid duplicates like "kinderboek" and "Kinderboek"
     final types = books
         .where((book) => book.type != null && book.type!.isNotEmpty)
-        .map((book) => book.type!)
+        .map((book) {
+          final type = book.type!;
+          return type[0].toUpperCase() + type.substring(1).toLowerCase();
+        })
         .toSet()
         .toList();
     types.sort();
