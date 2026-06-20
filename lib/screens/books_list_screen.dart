@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import '../models/book.dart';
-import '../services/api_service.dart';
+import '../services/interfaces/i_data_service.dart';
+import '../service_locator.dart';
 import '../utils/error_dialog.dart';
 import '../utils/book_filter.dart';
 import '../utils/book_sorter.dart';
@@ -29,7 +30,7 @@ class BooksListScreen extends StatefulWidget {
 }
 
 class _BooksListScreenState extends State<BooksListScreen> {
-  final ApiService _apiService = ApiService();
+  late final IDataService _dataService;
   final TextEditingController _searchController = TextEditingController();
   List<Book> _allBooks = [];
   List<Book> _filteredBooks = [];
@@ -52,6 +53,7 @@ class _BooksListScreenState extends State<BooksListScreen> {
   @override
   void initState() {
     super.initState();
+    _dataService = getIt<IDataService>();
     _loadBooks();
   }
 
@@ -68,7 +70,7 @@ class _BooksListScreenState extends State<BooksListScreen> {
     });
 
     try {
-      final response = await _apiService.getBooksWithTotal();
+      final response = await _dataService.getBooksWithTotal();
       setState(() {
         _allBooks = response.books;
         _totalBooks = response.total;
@@ -146,7 +148,7 @@ class _BooksListScreenState extends State<BooksListScreen> {
 
     if (confirm == true) {
       try {
-        await _apiService.deleteBook(id);
+        await _dataService.deleteBook(id);
         _loadBooks();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -229,7 +231,7 @@ class _BooksListScreenState extends State<BooksListScreen> {
       
       for (var bookId in _selectedBookIds.toList()) {
         try {
-          await _apiService.deleteBook(bookId);
+          await _dataService.deleteBook(bookId);
           successCount++;
         } catch (e) {
           errorCount++;
@@ -980,7 +982,7 @@ class _BooksListScreenState extends State<BooksListScreen> {
       if (result != null && result.files.single.bytes != null) {
         setState(() => _isImporting = true);
 
-        final message = await _apiService.importBooks(
+        final message = await _dataService.importBooks(
           result.files.single.name,
           result.files.single.bytes!,
         );
@@ -1017,7 +1019,7 @@ class _BooksListScreenState extends State<BooksListScreen> {
   }
 
   Future<void> _downloadTemplate() async {
-    final url = await _apiService.getTemplateUrl();
+    final url = await _dataService.getTemplateUrl();
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../services/api_service.dart';
+import '../services/interfaces/i_data_service.dart';
+import '../service_locator.dart';
 import '../models/book.dart';
 import '../utils/error_dialog.dart';
 import '../widgets/cover_image.dart';
@@ -12,7 +13,7 @@ class ReadingHistoryScreen extends StatefulWidget {
 }
 
 class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
-  final ApiService _apiService = ApiService();
+  late final IDataService _dataService;
   List<Map<String, dynamic>> _history = [];
   bool _isLoading = true;
   String? _error;
@@ -22,6 +23,7 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
   @override
   void initState() {
     super.initState();
+    _dataService = getIt<IDataService>();
     _loadHistory();
   }
 
@@ -32,7 +34,7 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
     });
 
     try {
-      final history = await _apiService.getReadingHistory();
+      final history = await _dataService.getReadingHistory();
       setState(() {
         _history = history;
         _isLoading = false;
@@ -47,7 +49,7 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
 
   Future<void> _loadBooksForYear(int year) async {
     try {
-      final books = await _apiService.getBooksByYear(year);
+      final books = await _dataService.getBooksByYear(year);
       setState(() {
         _selectedYear = year;
         _booksForYear = books;

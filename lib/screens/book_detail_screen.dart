@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/book.dart';
-import '../services/api_service.dart';
+import '../services/interfaces/i_data_service.dart';
+import '../service_locator.dart';
 import '../widgets/rating_stars.dart';
 import 'book_form_screen.dart';
 
@@ -22,12 +23,13 @@ class BookDetailScreen extends StatefulWidget {
 
 class _BookDetailScreenState extends State<BookDetailScreen> {
   late Book _currentBook;
-  final ApiService _apiService = ApiService();
+  late final IDataService _dataService;
   bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
+    _dataService = getIt<IDataService>();
     _currentBook = widget.book;
   }
 
@@ -36,7 +38,7 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
     
     setState(() => _isLoading = true);
     try {
-      final updatedBook = await _apiService.getBook(_currentBook.id!);
+      final updatedBook = await _dataService.getBook(_currentBook.id!);
       setState(() {
         _currentBook = updatedBook;
         _isLoading = false;

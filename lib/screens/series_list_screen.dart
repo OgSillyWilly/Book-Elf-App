@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/series.dart';
-import '../services/api_service.dart';
+import '../services/interfaces/i_data_service.dart';
+import '../service_locator.dart';
 import '../utils/error_dialog.dart';
 
 class SeriesListScreen extends StatefulWidget {
@@ -11,7 +12,7 @@ class SeriesListScreen extends StatefulWidget {
 }
 
 class _SeriesListScreenState extends State<SeriesListScreen> {
-  final ApiService _apiService = ApiService();
+  late final IDataService _dataService;
   List<Series> _series = [];
   bool _isLoading = true;
   String _searchQuery = '';
@@ -20,6 +21,7 @@ class _SeriesListScreenState extends State<SeriesListScreen> {
   @override
   void initState() {
     super.initState();
+    _dataService = getIt<IDataService>();
     _loadSeries();
   }
 
@@ -32,7 +34,7 @@ class _SeriesListScreenState extends State<SeriesListScreen> {
   Future<void> _loadSeries() async {
     setState(() => _isLoading = true);
     try {
-      final series = await _apiService.getSeries(search: _searchQuery.isEmpty ? null : _searchQuery);
+      final series = await _dataService.getSeries(search: _searchQuery.isEmpty ? null : _searchQuery);
       setState(() {
         _series = series;
         _isLoading = false;
@@ -40,7 +42,7 @@ class _SeriesListScreenState extends State<SeriesListScreen> {
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
-        ErrorDialog.show(context, 'Fout bij laden series', e.toString());
+        showErrorDialog(context, 'Fout bij laden series', e.toString());
       }
     }
   }
@@ -69,7 +71,7 @@ class _SeriesListScreenState extends State<SeriesListScreen> {
 
     if (confirmed == true) {
       try {
-        await _apiService.deleteSeries(series.id!);
+        await _dataService.deleteSeries(series.id!);
         _loadSeries();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -78,7 +80,7 @@ class _SeriesListScreenState extends State<SeriesListScreen> {
         }
       } catch (e) {
         if (mounted) {
-          ErrorDialog.show(context, 'Fout bij verwijderen', e.toString());
+          showErrorDialog(context, 'Fout bij verwijderen', e.toString());
         }
       }
     }
@@ -365,11 +367,12 @@ class _SeriesFormDialogState extends State<SeriesFormDialog> {
   late TextEditingController _authorController;
   late TextEditingController _totalBooksController;
   bool _isSaving = false;
-  final ApiService _apiService = ApiService();
+  late final IDataService _dataService;
 
   @override
   void initState() {
     super.initState();
+    _dataService = getIt<IDataService>();
     _nameController = TextEditingController(text: widget.series?.name);
     _descriptionController = TextEditingController(text: widget.series?.description);
     _authorController = TextEditingController(text: widget.series?.author);
@@ -401,9 +404,9 @@ class _SeriesFormDialogState extends State<SeriesFormDialog> {
 
     try {
       if (widget.series?.id != null) {
-        await _apiService.updateSeries(widget.series!.id!, data);
+        await _dataService.updateSeries(widget.series!.id!, data);
       } else {
-        await _apiService.createSeries(data);
+        await _dataService.createSeries(data);
       }
 
       if (mounted) {
@@ -417,7 +420,7 @@ class _SeriesFormDialogState extends State<SeriesFormDialog> {
     } catch (e) {
       setState(() => _isSaving = false);
       if (mounted) {
-        ErrorDialog.show(context, 'Fout bij opslaan', e.toString());
+        showErrorDialog(context, 'Fout bij opslaan', e.toString());
       }
     }
   }
@@ -515,7 +518,7 @@ class SeriesDetailScreen extends StatefulWidget {
 }
 
 class _SeriesDetailScreenState extends State<SeriesDetailScreen> {
-  final ApiService _apiService = ApiService();
+  late final IDataService _dataService;
   bool _isLoading = true;
   Series? _series;
   double _progress = 0.0;
@@ -524,13 +527,14 @@ class _SeriesDetailScreenState extends State<SeriesDetailScreen> {
   @override
   void initState() {
     super.initState();
+    _dataService = getIt<IDataService>();
     _loadSeriesDetails();
   }
 
   Future<void> _loadSeriesDetails() async {
     setState(() => _isLoading = true);
     try {
-      final data = await _apiService.getSeriesWithProgress(widget.seriesId);
+      final data = await _dataService.getSeriesWithProgress(widget.seriesId);
       setState(() {
         _series = Series.fromJson(data['series']);
         _progress = (data['progress'] as num?)?.toDouble() ?? 0.0;
@@ -540,7 +544,7 @@ class _SeriesDetailScreenState extends State<SeriesDetailScreen> {
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
-        ErrorDialog.show(context, 'Fout bij laden', e.toString());
+        showErrorDialog(context, 'Fout bij laden', e.toString());
       }
     }
   }

@@ -3,12 +3,16 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/books_list_screen.dart';
 import 'screens/splash_screen.dart';
 import 'config/app_config.dart';
+import 'service_locator.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   // Load environment configuration
   await AppConfig.load();
+  
+  // Setup dependency injection
+  await setupServiceLocator();
   
   runApp(const MyApp());
 }

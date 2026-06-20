@@ -6,7 +6,8 @@ import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../constants/book_types.dart';
 import '../models/book.dart';
-import '../services/api_service.dart';
+import '../services/interfaces/i_data_service.dart';
+import '../service_locator.dart';
 import '../services/google_books_service.dart';
 import '../services/image_upload_service.dart';
 import '../utils/error_dialog.dart';
@@ -36,7 +37,7 @@ class _BookFormScreenState extends State<BookFormScreen> {
   final _startDateController = TextEditingController();
   final _endDateController = TextEditingController();
   final _coverUrlController = TextEditingController();
-  final ApiService _apiService = ApiService();
+  late final IDataService _dataService;
   final GoogleBooksService _googleBooksService = GoogleBooksService();
   
   String _selectedType = 'boek';
@@ -87,6 +88,7 @@ class _BookFormScreenState extends State<BookFormScreen> {
   @override
   void initState() {
     super.initState();
+    _dataService = getIt<IDataService>();
     if (widget.book != null) {
       _titleController.text = widget.book!.title;
       _authorController.text = widget.book!.author;
@@ -465,7 +467,7 @@ class _BookFormScreenState extends State<BookFormScreen> {
       };
 
       if (widget.book == null) {
-        final newBook = await _apiService.createBook(bookData);
+        final newBook = await _dataService.createBook(bookData);
         
         // Als er een afbeelding geselecteerd is, upload deze nu
         if (_selectedImage != null && newBook.id != null) {
@@ -505,7 +507,7 @@ class _BookFormScreenState extends State<BookFormScreen> {
           }
         }
       } else {
-        await _apiService.updateBook(widget.book!.id!, bookData);
+        await _dataService.updateBook(widget.book!.id!, bookData);
       }
 
       if (mounted) {
