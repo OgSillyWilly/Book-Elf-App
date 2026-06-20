@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/book.dart';
-import '../services/api_service.dart';
+import '../services/interfaces/i_data_service.dart';
+import '../service_locator.dart';
 import '../utils/error_dialog.dart';
 
 class EnhancedStatisticsScreen extends StatefulWidget {
@@ -12,7 +13,7 @@ class EnhancedStatisticsScreen extends StatefulWidget {
 }
 
 class _EnhancedStatisticsScreenState extends State<EnhancedStatisticsScreen> with SingleTickerProviderStateMixin {
-  final ApiService _apiService = ApiService();
+  late final IDataService _dataService;
   late TabController _tabController;
   bool _isLoading = true;
   Map<String, dynamic> _overview = {};
@@ -23,6 +24,7 @@ class _EnhancedStatisticsScreenState extends State<EnhancedStatisticsScreen> wit
   @override
   void initState() {
     super.initState();
+    _dataService = getIt<IDataService>();
     _tabController = TabController(length: 4, vsync: this);
     _loadStatistics();
   }
@@ -36,10 +38,10 @@ class _EnhancedStatisticsScreenState extends State<EnhancedStatisticsScreen> wit
   Future<void> _loadStatistics() async {
     setState(() => _isLoading = true);
     try {
-      final overview = await _apiService.getStatisticsOverview();
-      final patterns = await _apiService.getReadingPatterns(year: DateTime.now().year);
-      final series = await _apiService.getSeriesProgress();
-      final topRated = await _apiService.getTopRatedBooks(limit: 10);
+      final overview = await _dataService.getStatisticsOverview();
+      final patterns = await _dataService.getReadingPatterns(year: DateTime.now().year);
+      final series = await _dataService.getSeriesProgress();
+      final topRated = await _dataService.getTopRatedBooks(limit: 10);
       
       setState(() {
         _overview = overview;
@@ -51,7 +53,7 @@ class _EnhancedStatisticsScreenState extends State<EnhancedStatisticsScreen> wit
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
-        ErrorDialog.show(context, 'Fout bij laden statistieken', e.toString());
+        showErrorDialog(context, 'Fout bij laden statistieken', e.toString());
       }
     }
   }

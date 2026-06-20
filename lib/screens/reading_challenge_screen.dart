@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/reading_challenge.dart';
 import '../models/book.dart';
-import '../services/api_service.dart';
+import '../services/interfaces/i_data_service.dart';
+import '../service_locator.dart';
 import '../utils/error_dialog.dart';
 
 class ReadingChallengeScreen extends StatefulWidget {
@@ -13,7 +14,7 @@ class ReadingChallengeScreen extends StatefulWidget {
 }
 
 class _ReadingChallengeScreenState extends State<ReadingChallengeScreen> {
-  final ApiService _apiService = ApiService();
+  late final IDataService _dataService;
   ReadingChallenge? _activeChallenge;
   List<ReadingChallenge> _allChallenges = [];
   bool _isLoading = true;
@@ -22,14 +23,15 @@ class _ReadingChallengeScreenState extends State<ReadingChallengeScreen> {
   @override
   void initState() {
     super.initState();
+    _dataService = getIt<IDataService>();
     _loadChallenges();
   }
 
   Future<void> _loadChallenges() async {
     setState(() => _isLoading = true);
     try {
-      final active = await _apiService.getActiveChallenge();
-      final all = await _apiService.getReadingChallenges();
+      final active = await _dataService.getActiveChallenge();
+      final all = await _dataService.getReadingChallenges();
       setState(() {
         _activeChallenge = active;
         _allChallenges = all;
@@ -38,7 +40,7 @@ class _ReadingChallengeScreenState extends State<ReadingChallengeScreen> {
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
-        ErrorDialog.show(context, 'Fout bij laden challenges', e.toString());
+        showErrorDialog(context, 'Fout bij laden challenges', e.toString());
       }
     }
   }
@@ -67,7 +69,7 @@ class _ReadingChallengeScreenState extends State<ReadingChallengeScreen> {
 
     if (confirmed == true) {
       try {
-        await _apiService.deleteChallenge(challenge.id!);
+        await _dataService.deleteChallenge(challenge.id!);
         _loadChallenges();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -76,7 +78,7 @@ class _ReadingChallengeScreenState extends State<ReadingChallengeScreen> {
         }
       } catch (e) {
         if (mounted) {
-          ErrorDialog.show(context, 'Fout bij verwijderen', e.toString());
+          showErrorDialog(context, 'Fout bij verwijderen', e.toString());
         }
       }
     }
@@ -173,7 +175,7 @@ class _ReadingChallengeScreenState extends State<ReadingChallengeScreen> {
             const SizedBox(height: 24),
             if (_activeChallenge!.id != null) _ChallengeSuggestionsWidget(
               challengeId: _activeChallenge!.id!,
-              apiService: _apiService,
+              apiService: _dataService,
             ),
           ],
         ),
@@ -495,7 +497,7 @@ class _StatChip extends StatelessWidget {
 
 class _ChallengeSuggestionsWidget extends StatefulWidget {
   final int challengeId;
-  final ApiService apiService;
+  final IDataService apiService;
 
   const _ChallengeSuggestionsWidget({
     required this.challengeId,
@@ -627,11 +629,12 @@ class _ChallengeFormDialogState extends State<ChallengeFormDialog> {
   String _periodType = 'yearly';
   bool _isActive = true;
   bool _isSaving = false;
-  final ApiService _apiService = ApiService();
+  late final IDataService _dataService;
 
   @override
   void initState() {
     super.initState();
+    _dataService = getIt<IDataService>();
     _nameController = TextEditingController(text: widget.challenge?.name);
     _descriptionController = TextEditingController(text: widget.challenge?.description);
     _goalBooksController = TextEditingController(
@@ -687,9 +690,9 @@ class _ChallengeFormDialogState extends State<ChallengeFormDialog> {
 
     try {
       if (widget.challenge?.id != null) {
-        await _apiService.updateChallenge(widget.challenge!.id!, data);
+        await _dataService.updateChallenge(widget.challenge!.id!, data);
       } else {
-        await _apiService.createChallenge(data);
+        await _dataService.createChallenge(data);
       }
 
       if (mounted) {
@@ -703,7 +706,7 @@ class _ChallengeFormDialogState extends State<ChallengeFormDialog> {
     } catch (e) {
       setState(() => _isSaving = false);
       if (mounted) {
-        ErrorDialog.show(context, 'Fout bij opslaan', e.toString());
+        showErrorDialog(context, 'Fout bij opslaan', e.toString());
       }
     }
   }
@@ -840,7 +843,7 @@ class ChallengeDetailScreen extends StatefulWidget {
 }
 
 class _ChallengeDetailScreenState extends State<ChallengeDetailScreen> {
-  final ApiService _apiService = ApiService();
+  late final IDataService _dataService;
   bool _isLoading = true;
   ReadingChallenge? _challenge;
   List<Book> _booksRead = [];
@@ -848,13 +851,14 @@ class _ChallengeDetailScreenState extends State<ChallengeDetailScreen> {
   @override
   void initState() {
     super.initState();
+    _dataService = getIt<IDataService>();
     _loadChallengeDetails();
   }
 
   Future<void> _loadChallengeDetails() async {
     setState(() => _isLoading = true);
     try {
-      final data = await _apiService.getChallengeWithDetails(widget.challengeId);
+      final data = await _dataService.getChallengeWithDetails(widget.challengeId);
       setState(() {
         _challenge = ReadingChallenge.fromJson(data['challenge']);
         final booksData = data['books_read'] as List;
@@ -864,7 +868,7 @@ class _ChallengeDetailScreenState extends State<ChallengeDetailScreen> {
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
-        ErrorDialog.show(context, 'Fout bij laden', e.toString());
+        showErrorDialog(context, 'Fout bij laden', e.toString());
       }
     }
   }

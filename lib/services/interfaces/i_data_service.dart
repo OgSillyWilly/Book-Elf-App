@@ -94,4 +94,13 @@ abstract class IDataService {
   
   /// Get overview statistics (totals, reading progress, etc.)
   Future<Map<String, dynamic>> getStatisticsOverview();
+  
+  /// Get reading patterns for a specific year
+  Future<Map<String, dynamic>> getReadingPatterns({int? year});
+  
+  /// Get series progress statistics
+  Future<Map<String, dynamic>> getSeriesProgress();
+  
+  /// Get top rated books
+  Future<List<Book>> getTopRatedBooks({int limit = 10});
 }
