@@ -7,9 +7,14 @@ class AppConfig {
     if (kIsWeb) {
       // Web/Chrome - use localhost
       return dotenv.get('API_BASE_URL_WEB', fallback: 'http://127.0.0.1:8000/api');
+    } else if (defaultTargetPlatform == TargetPlatform.macOS || 
+               defaultTargetPlatform == TargetPlatform.windows || 
+               defaultTargetPlatform == TargetPlatform.linux) {
+      // Desktop platforms - use localhost
+      return dotenv.get('API_BASE_URL_WEB', fallback: 'http://127.0.0.1:8000/api');
     } else {
-      // Mobile (iOS/Android) - use local network IP
-      return dotenv.get('API_BASE_URL_MOBILE', fallback: 'http://10.242.187.102:8000/api');
+      // Mobile (iOS/Android) - use local network IP or localhost
+      return dotenv.get('API_BASE_URL_MOBILE', fallback: 'http://127.0.0.1:8000/api');
     }
   }
 
